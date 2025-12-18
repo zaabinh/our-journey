@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="style_album.css" rel="stylesheet">
+    <!-- Swiper CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.css">
+    <title>Album - Our Journey</title>
+    <link rel="icon" href="assets/icon/love.png" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icon/love.png">
+</head>
+<body>
+    <header>
+        <div class="navbar-box">
+            <div id="site-icon-title">
+                <img src="assets/icon/love.png" class="site-icon">
+                <h1 class="site-title">Our Journey</h1>
+            </div>
+            <nav>
+                <ul class="navbar" style="margin: 0;">
+                    <li><a href="home.html">Home</a></li>
+                    <li><a href="album.html">Album</a></li>
+                    <li id="nav-login"><a href="login_page.html">Login</a></li>
+                    <li id="nav-signup"><a href="signup_page.html">Sign Up</a></li>
+                    <li id="nav-user" style="display:none;">
+                      <img src="assets/icon/user.png" width="32">
+                      <a id="nav-username" href="profile.html"></a>
+                      <button id="nav-signout">Sign Out</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+        <div class="search-bar">
+            <div class="search-input-container">
+                <input type="text" placeholder="Search for our memory here..." class="search-input" id="searchInput">
+                <button type="button" class="clear-btn" id="clearBtn" style="display: none;">×</button>
+            </div>
+        </div>
+    </header>
+    <main>
+        <article class="images">
+            <div class="new-image-card" id="newImageCard">
+                <div class="plus-box" onclick="openFormPopup(event)">
+                    <span class="plus">+</span>
+                </div>
+                <div class="label" onclick="openFormPopup(event)">
+                    New Image
+                </div>
+            </div>
+            <div class="popup" id="popupForm">
+                <div class="form-popup">
+                    <h2>Add New Image</h2>
+                    <form id="addImageForm">
+                        <label for="imageFile">Images (select multiple):</label>
+                        <input type="file" id="imageFile" accept="image/*" multiple required>
+                        
+                        <div class="image-preview-container">
+                            <!-- Swiper container for image preview -->
+                            <div class="swiper image-preview-swiper">
+                                <div class="swiper-wrapper" id="imagePreview"></div>
+                                <div class="swiper-pagination"></div>
+                                <div class="swiper-button-next"></div>
+                                <div class="swiper-button-prev"></div>
+                            </div>
+                            <div class="image-counter">
+                                <span id="currentImageIndex">0</span>/<span id="totalImages">0</span>
+                            </div>
+                        </div>
+
+                        <label for="imageTitle">Title:</label>
+                        <input type="text" id="imageTitle" placeholder="Enter title" required>
+
+                        <label for="imageDate">Date:</label>
+                        <input type="text" id="imageDate" required>
+
+                        <label for="imageLoc">Location:</label>
+                        <input type="text" id="imageLoc" required>
+
+                        <label for="imageNote">Image story:</label>
+                        <div class="text-formatting-controls">
+                            <button type="button" onclick="applyFormatting('bold')" title="Bold"><b>B</b></button>
+                            <button type="button" onclick="applyFormatting('italic')" title="Italic"><i>I</i></button>
+                            <button type="button" onclick="applyFormatting('underline')" title="Underline"><u>U</u></button>
+                            <button type="button" onclick="applyFormatting('breakline')" title="Line Break">⏎</button>
+                        </div>
+                        <textarea id="imageNote" placeholder="Your story here" rows="3"></textarea>
+                        <div class="animation-controls">
+                            <label>Animation Effects:</label>
+                            <div class="animation-options">
+                                <input type="checkbox" id="heartAnimation" name="animations" value="heart">
+                                <label for="heartAnimation">Hearts</label>
+                                <input type="checkbox" id="giftAnimation" name="animations" value="gift">
+                                <label for="giftAnimation">Gifts</label>
+                            </div>
+                        </div>
+                        <div class="popup-buttons">
+                            <button type="submit">Add</button>
+                            <button type="button" id="cancel" onclick="closeFormPopup()">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="popup" id="popupModify"></div>
+        </article>
+    </main>
+    <footer>
+        <div class="footer-content">
+            <button onclick="exportData()">Export Data</button>
+            <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importData(event)">
+            <button onclick="document.getElementById('importFile').click()">Import Data</button>
+        </div>
+    </footer>
+    <!-- Swiper JS -->
+    <script src="https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js"></script>
+    <script src="script.js"></script>
+    <script src="auth.js"></script>
+</body>
+</html>

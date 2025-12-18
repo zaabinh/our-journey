@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="style_home.css" rel="stylesheet">
+    <title>Home - Our Journey</title>
+    <link rel="icon" href="assets/icon/love.png" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icon/love.png">
+</head>
+<body>
+    <header>
+        <div class="navbar-box">
+            <div id="site-icon-title">
+                <img src="assets/icon/love.png" class="site-icon">
+                <h1 class="site-title">Our Journey</h1>
+            </div>
+            <nav>
+                <ul class="navbar" style="margin: 0;">
+                    <li><a href="home.html">Home</a></li>
+                    <li><a href="album.html">Album</a></li>
+                    <li id="nav-login"><a href="login_page.html">Login</a></li>
+                    <li id="nav-signup"><a href="signup_page.html">Sign Up</a></li>
+                    <li id="nav-user" style="display:none;">
+                        <a id="nav-username" href="profile.html"></a>
+                        <button id="nav-signout">Sign Out</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main>
+        <h2>Welcome!</h2>
+        <div class="content-container">
+            <div class="para-block">
+                <button class="reveal-btn" id="rbtn-1" onclick="revealPara('para1', 'rbtn-2', this)">Click me!</button>
+                <p class="paragraph" id="para1" style="display: none;">
+                    <span class="typed-text" data-text="Firstly, you should know that I'm so happy to be your lover, your companion, your soulmate throughout 4-year long."></span>
+                </p>
+            </div>
+
+            <div class="para-block">
+                <button class="reveal-btn" id="rbtn-2" onclick="revealPara('para2', 'rbtn-3', this)" style="display: none;">Click me!</button>
+                <p class="paragraph" id="para2" style="display: none;">
+                    <span class="typed-text" data-text="Definitely, it's my pleasure to have such a charming girl like you beside me all the time."></span>
+                </p>
+            </div>
+
+            <div class="para-block">
+                <button class="reveal-btn" id="rbtn-3" onclick="revealPara('para3', 'rbtn-4', this)" style="display: none;">Click me!</button>
+                <p class="paragraph" id="para3" style="display: none;">
+                    <span class="typed-text" data-text="Therefore, for the significant occasion like this, I want us to look back at Our Journey."></span>
+                </p>
+            </div>
+
+            <div class="para-block">
+                <button class="reveal-btn" id="rbtn-4" onclick="revealPara('para4', 'start-btn', this)" style="display: none;">Click me!</button>
+                <p class="paragraph" id="para4" style="display: none;">
+                    <span class="typed-text" data-text="By creating this website, we can view and save our memory anytime, anywhere."></span>
+                </p>
+            </div>
+            <div class="para-block">
+                <a href="login_page.html" class="start-btn" id="start-btn" style="display: none;">Let's start</a>
+            </div>
+        </div>
+    </main>
+    <script>
+        function revealPara(id_pr, id_btn, btn) {
+            const para = document.getElementById(id_pr);
+            const next_btn = document.getElementById(id_btn)
+            para.style.display = 'block';
+            para.classList.add('fade-in');
+            btn.style.display = 'none';
+            next_btn.style.display = 'inline-block';
+            typeWriter(para.querySelector('.typed-text'));
+        }
+
+        function typeWriter(element) {
+            const text = element.getAttribute('data-text');
+            let i = 0;
+            element.textContent = '';
+            function type() {
+                if (i < text.length) {
+                    element.textContent += text.charAt(i);
+                    i++;
+                    setTimeout(type, 30);
+                }
+            }
+            type();
+        }
+    </script>
+</body>
+</html>

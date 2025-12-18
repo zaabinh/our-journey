@@ -1,0 +1,365 @@
+/* Fonts */
+@font-face {
+  font-family: 'Dancing Script';
+  src: url('assets/font/DancingScript-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'Cormorant Garamond';
+  src: url('assets/font/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Base styles */
+body {
+  background-color: #f1e4f3;
+  font-family: 'Cormorant Garamond', cursive;
+  user-select: none;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+main {
+  background-blend-mode: overlay;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: center;
+}
+
+/* Header and Navigation */
+.site-icon-title {
+    align-items: center;
+    gap:0px;
+}
+.site-icon {
+  width: 50px;
+  height: 50px;
+  display: inline-flex;
+}
+.site-title {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+.navbar-box {
+  background: #fff0f3;
+  border-radius: 0px;
+  box-shadow: 0 2px 12px rgba(90, 13, 34, 0.08);
+  padding:18px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0px;
+  margin-bottom: 18px;
+}
+
+h1 {
+  font-family: 'Dancing Script', cursive;
+  font-size: 50px;
+  margin: 0 40px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+}
+
+.navbar {
+  list-style: none;
+  display: flex;
+  gap: 30px;
+  padding: 0;
+  margin: 0;
+  align-items: center;
+}
+
+.navbar li {
+  display: flex;
+  align-items: center;
+}
+
+.navbar li a {
+  text-decoration: none;
+  color: #590d22;
+  font-size: 30px;
+  font-family: 'Cormorant Garamond', cursive;
+  padding: 6px 16px;
+  border-radius: 8px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.navbar li a:hover {
+  background: #fff0f3;
+  color: #b6465f;
+}
+
+/* Search Bar */
+.search-form {
+  display: flex;
+  align-items: center;
+  margin-left: 30px;
+  gap: 24px;
+}
+
+.search-input {
+  padding: 8px 5px;
+  border: 1px solid #b6465f;
+  border-radius: 8px 0 0 8px;
+  font-size: 18px;
+  outline: none;
+  font-family: 'Cormorant Garamond', cursive;
+}
+
+.search-btn {
+  padding: 7px 12px;
+  border: 1px solid #b6465f;
+  border-left: none;
+  background: #b6465f;
+  color: #fff;
+  border-radius: 0 8px 8px 0;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.search-btn:hover {
+  background: #590d22;
+}
+
+
+/* Button */
+button {
+  background-color: #6a1e1e;
+  color: #fff8e7;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 15px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+  align-self: flex-end;
+  font-size: 20px;
+  width: fit-content;
+  margin-top: 20px;
+  z-index: 2;
+  transform: translateX(-50%);
+}
+
+button:hover {
+  background-color: #590d22;
+}
+
+#nav-user{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#nav-username {
+  color: #590d22;
+  font-size: 20px;
+  padding: 4px 6px;
+}
+
+#nav-user button {
+  transform: none;
+  margin-left: 6px;
+  padding: 6px 10px;
+  font-size: 18px;
+}
+
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes highlight-pulse {
+  0% { color: #590d22; transform: scale(1); }
+  50% { color: #b6465f; transform: scale(1.1); }
+  100% { color: #590d22; transform: scale(1); }
+}
+
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-20px); }
+  100% { transform: translateY(0px); }
+}
+
+@keyframes typing {
+  from { width: 0 } /* Starts with no visible text */
+  to { width: 100% } /* Expands to reveal full text */
+}
+
+@keyframes blink-cursor {
+  from, to { border-color: transparent } /* Cursor is transparent at start/end */
+  50% { border-color: black } /* Cursor is visible halfway through */
+}
+.content-container {
+  margin: 30px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+h2 {
+  font-size: 120px;
+  margin: 0 0;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  font-family: 'Dancing Script';
+}
+
+.para-block {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typed-text {
+  font-size: 40px;
+  line-height: 2;
+  margin: 0;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  font-family: 'Dancing Script';
+  text-align: center;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  align-items: center;
+  display: block;
+}
+
+.highlight {
+  animation: highlight-pulse 2s infinite;
+}
+
+.reveal-btn {
+  background-color: #b6465f;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  width: fit-content;
+  height: 50px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-family: 'Cormorant Garamond', cursive;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  font-size: 30px;
+}
+
+.reveal-btn:hover {
+  background-color: #590d22;
+  transform: scale(1.01);
+}
+
+.start-btn {
+  display: inline-block;
+  background-color: #6a1e1e;
+  color: #fff8e7;
+  text-decoration: none;
+  border-radius: 12px;
+  padding: 16px 32px;
+  font-size: 28px;
+  margin-top: 40px;
+  transition: all 0.3s;
+  font-family: 'Cormorant Garamond', cursive;
+  box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+}
+
+.start-btn:hover {
+  background-color: #590d22;
+  transform: scale(1.05);
+}
+
+/* Media Queries for Responsive Design */
+@media (max-width: 768px) {
+  /* Mobile styles */
+  h2 {
+    font-size: 60px;
+  }
+
+  .navbar {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .navbar li a {
+    font-size: 20px;
+    padding: 4px 8px;
+  }
+
+  .content-container {
+    margin: 20px;
+    width: calc(100% - 40px);
+  }
+
+  .reveal-btn {
+    width: 200px;
+    height: 40px;
+    font-size: 20px;
+  }
+
+  .start-btn {
+    width: 200px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .typed-text {
+    font-size: 30px;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* Tablet styles */
+  h2 {
+    font-size: 90px;
+  }
+
+  .navbar {
+    gap: 20px;
+  }
+
+  .navbar li a {
+    font-size: 25px;
+  }
+
+  .content-container {
+    margin: 25px;
+    width: calc(100% - 50px);
+  }
+
+  .reveal-btn {
+    width: 250px;
+    height: 45px;
+    font-size: 25px;
+  }
+
+  .start-btn {
+    width: 250px;
+    height: 55px;
+    font-size: 25px;
+  }
+
+  .typed-text {
+    font-size: 35px;
+  }
+}
+
+@media (min-width: 1025px) {
+  /* Desktop styles - keep original */
+}
+

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="style_login.css" rel="stylesheet">
+    <link rel="icon" href="assets/icon/love.png" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="assets/icon/love.png">
+    <title>Log in - Our Journey</title>
+</head>
+<body>
+    <header>
+        <div class="navbar-box">
+            <div id="site-icon-title">
+                <img src="assets/icon/love.png" class="site-icon">
+                <h1 class="site-title">Our Journey</h1>
+            </div>
+            <nav>
+                <ul class="navbar" style="margin: 0;">
+                    <li><a href="home.html">Home</a></li>
+                    <li><a href="album.html">Album</a></li>
+                    <li id="nav-login"><a href="login_page.html">Login</a></li>
+                    <li id="nav-signup"><a href="signup_page.html">Sign Up</a></li>
+                    <li id="nav-user" style="display:none;">
+                        <a id="nav-username" href="profile.html"></a>
+                        <button id="nav-signout">Sign Out</button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    <main>
+        <div class="login">
+            <form class="login-form" id="loginForm">
+                <h1>LOG IN</h1>
+                <div class="form-group">
+                    <label for="loginUsername">Username: </label>
+                    <input type="text" id="loginUsername" required>
+                    <div class="error-message" id="usernameError"></div>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password: </label>
+                    <input type="password" id="loginPassword" required>
+                    <div class="error-message" id="passwordError"></div>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="submit" id="loginSubmit">Log in</button>
+                </div>
+            </form>
+        </div>
+        <script src="auth.js"></script>
+        <script src="script.js"></script>
+    </main>
