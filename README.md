@@ -1,5 +1,7 @@
 # Our Journey - Photo Gallery Web Application
 
+Frontend React mới đang được phát triển riêng trong [`frontend/`](frontend/README.md), chạy bằng dữ liệu demo tổng hợp. HTML/CSS/JS cũ và dữ liệu đã track được giữ nguyên. Trạng thái từng phase, kiểm thử và blocker migration nằm trong [`docs/FRONTEND_PROGRESS.md`](docs/FRONTEND_PROGRESS.md). Chưa có export từ browser origin cũ; không dùng dữ liệu thật làm fixture và không deploy.
+
 A responsive, interactive photo gallery web application that allows users to share and manage memories from their journey together. Built with vanilla HTML, CSS, and JavaScript.
 
 ## Features
