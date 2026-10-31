@@ -29,7 +29,7 @@ export function AlbumForm({
   return (
     <Dialog
       title={album ? 'Sửa album' : 'Album mới'}
-      description="Album demo chỉ lưu trên trình duyệt này."
+      description={album ? 'Cập nhật tên và phần giới thiệu cho album.' : 'Tạo một không gian riêng để lưu lại những câu chuyện của bạn.'}
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();

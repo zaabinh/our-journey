@@ -9,10 +9,12 @@ import {
 } from 'react';
 import type { Command, Id, JourneyRepository, Store } from '../domain/types';
 import { LocalRepository } from '../data/local/repository';
-const repository = new LocalRepository();
+import { HttpRepository } from '../data/http/repository';
+const repository: JourneyRepository = import.meta.env.MODE === 'test' || import.meta.env.VITE_DATA_MODE === 'local' ? new LocalRepository() : new HttpRepository();
 interface Journey {
   repo: JourneyRepository;
   state?: Store;
+  initialized: boolean;
   actor: Id;
   error: string;
   busy: boolean;
@@ -21,6 +23,9 @@ interface Journey {
   dispatch: (command: Command) => Promise<Id | undefined>;
   select: (id: Id) => Promise<void>;
   create: (name: string, email: string) => Promise<Id>;
+  login: (identifier: string, password: string) => Promise<void>;
+  register: (input: { email: string; username: string; display_name: string; password: string }) => Promise<void>;
+  logout: () => Promise<void>;
 }
 export const JourneyContext = createContext<Journey | null>(null);
 export const errorMessage = (e: unknown) =>
@@ -33,6 +38,7 @@ export function JourneyProvider({
   repo?: JourneyRepository;
 }) {
   const [state, setState] = useState<Store>(),
+    [initialized, setInitialized] = useState(false),
     [actor, setActor] = useState(''),
     [error, setError] = useState(''),
     [pending, setPending] = useState(0);
@@ -45,12 +51,14 @@ export function JourneyProvider({
       if (current === request.current) {
         setActor(identity.active);
         setState(next);
+        setInitialized(true);
         setError('');
       }
     } catch (e) {
       if (current === request.current) {
         setError(errorMessage(e));
         setState(undefined);
+        setInitialized(true);
       }
       throw e;
     }
@@ -76,6 +84,7 @@ export function JourneyProvider({
       value={{
         repo,
         state,
+        initialized,
         actor,
         error,
         busy: pending > 0,
@@ -87,6 +96,23 @@ export function JourneyProvider({
             ? mutate(() => repo.selectIdentity(id))
             : Promise.resolve(),
         create: (name, email) => mutate(() => repo.createIdentity(name, email)),
+        login: async (identifier, password) => {
+          const auth = repo as JourneyRepository & { login?: (identifier: string, password: string) => Promise<void> };
+          if (!auth.login) throw Error('Đăng nhập không khả dụng.');
+          await auth.login(identifier, password);
+          await refresh();
+        },
+        register: async (input) => {
+          const auth = repo as JourneyRepository & { register?: (input: { email: string; username: string; display_name: string; password: string }) => Promise<void> };
+          if (!auth.register) throw Error('Đăng ký không khả dụng.');
+          await auth.register(input);
+          await refresh();
+        },
+        logout: async () => {
+          const auth = repo as JourneyRepository & { logout?: () => Promise<void> };
+          if (!auth.logout) throw Error('Đăng xuất không khả dụng.');
+          await auth.logout(); setState(undefined); setActor(''); setError('');
+        },
       }}
     >
       {children}

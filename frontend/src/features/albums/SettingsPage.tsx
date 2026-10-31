@@ -10,7 +10,7 @@ import { LegacyImport } from './LegacyImport';
 import { AlbumForm } from './AlbumForm';
 export function SettingsPage() {
   const { albumId = '' } = useParams(),
-    { state, actor, dispatch } = useJourney(),
+    { state, actor, dispatch, repo } = useJourney(),
     action = useAction(),
     navigate = useNavigate();
   const [edit, setEdit] = useState(false),
@@ -95,7 +95,7 @@ export function SettingsPage() {
               <MemberSettings albumId={albumId} />
             </section>
 
-            <section className="settings-card settings-invites-card" aria-label="Lời mời">
+            {repo.mode !== 'remote' && <section className="settings-card settings-invites-card" aria-label="Lời mời">
               <div className="settings-card-heading">
                 <span className="settings-step">03</span>
                 <div>
@@ -103,9 +103,9 @@ export function SettingsPage() {
                 </div>
               </div>
               <InviteSettings albumId={albumId} />
-            </section>
+            </section>}
 
-            <section className="settings-card settings-import-card" aria-label="Nhập dữ liệu">
+            {repo.mode !== 'remote' && <section className="settings-card settings-import-card" aria-label="Nhập dữ liệu">
               <div className="settings-card-heading">
                 <span className="settings-step">04</span>
                 <div>
@@ -113,7 +113,7 @@ export function SettingsPage() {
                 </div>
               </div>
               <LegacyImport albumId={albumId} />
-            </section>
+            </section>}
 
             <section className="settings-danger-zone" aria-labelledby="delete-album-title">
               <div>

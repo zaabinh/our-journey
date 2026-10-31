@@ -13,16 +13,17 @@ export function BlobImage({
   full?: boolean;
 }) {
   const blob = photo ? (full ? photo.blob : (photo.thumbnail ?? photo.blob)) : provided;
+  const remoteSrc = photo ? (full ? photo.src : (photo.thumbnailSrc ?? photo.src)) : undefined;
   const [url, setUrl] = useState(''),
     [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (!blob) return;
+    if (!blob || remoteSrc) return;
     const next = URL.createObjectURL(blob);
     setUrl(next);
     setFailed(false);
     return () => URL.revokeObjectURL(next);
-  }, [blob]);
-  if (!blob)
+  }, [blob, remoteSrc]);
+  if (!remoteSrc && (!blob || !blob.size))
     return (
       <div className="photo-placeholder" role="img" aria-label={alt}>
         Chưa có ảnh
@@ -34,11 +35,11 @@ export function BlobImage({
         Không tải được ảnh
       </div>
     );
-  return url ? (
+  return remoteSrc || url ? (
     <img
       key={url}
       className={full ? 'photo-full' : 'photo-thumb'}
-      src={url}
+      src={remoteSrc ?? url}
       alt={alt}
       width="640"
       height="480"

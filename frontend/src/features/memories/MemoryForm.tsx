@@ -33,9 +33,18 @@ export function MemoryForm({
   const previewCache = useRef(new WeakMap<Blob, Blob>());
   const storyRef = useRef<HTMLTextAreaElement>(null);
   const [initial, setInitial] = useState(
-      () => memory?.photoIds.map((id) => state!.photos.find((p) => p.id === id)!.blob) ?? [],
+      () =>
+        memory?.photoIds
+          .map((id) => state!.photos.find((p) => p.id === id)!)
+          .filter((p) => !p.src)
+          .map((p) => p.blob) ?? [],
     ),
-    [blobs, setBlobs] = useState<Blob[]>(initial);
+    [blobs, setBlobs] = useState<Blob[]>(initial),
+    [preservedPhotoIds, setPreservedPhotoIds] = useState<string[]>(
+      () =>
+        memory?.photoIds.filter((id) => !!state!.photos.find((p) => p.id === id)?.src) ?? [],
+    ),
+    [initialPreservedPhotoIds, setInitialPreservedPhotoIds] = useState(preservedPhotoIds);
   useEffect(() => {
     if (open) {
       setTitle(memory?.title ?? '');
@@ -44,14 +53,16 @@ export function MemoryForm({
       setNote(memory?.note ?? '');
       setHeart(!!memory?.animations.heart);
       setGift(!!memory?.animations.gift);
-      const current =
-        memory?.photoIds.map((id) => state!.photos.find((p) => p.id === id)!.blob) ?? [];
-      for (const id of memory?.photoIds ?? []) {
-        const p = state!.photos.find((p) => p.id === id)!;
+      const photos = memory?.photoIds.map((id) => state!.photos.find((p) => p.id === id)!) ?? [],
+        current = photos.filter((p) => !p.src).map((p) => p.blob),
+        remoteIds = photos.filter((p) => p.src).map((p) => p.id);
+      for (const p of photos.filter((photo) => !photo.src)) {
         previewCache.current.set(p.blob, p.thumbnail ?? p.blob);
       }
       setInitial(current);
       setBlobs(current);
+      setPreservedPhotoIds(remoteIds);
+      setInitialPreservedPhotoIds(remoteIds);
     }
   }, [open]);
   function format(marker: string) {
@@ -73,7 +84,9 @@ export function MemoryForm({
     heart !== !!memory?.animations.heart ||
     gift !== !!memory?.animations.gift ||
     blobs.length !== initial.length ||
-    blobs.some((b, i) => b !== initial[i]);
+    blobs.some((b, i) => b !== initial[i]) ||
+    preservedPhotoIds.length !== initialPreservedPhotoIds.length ||
+    preservedPhotoIds.some((id, i) => id !== initialPreservedPhotoIds[i]);
   useUnsavedChanges(open && dirty);
   function move(index: number, step: number) {
     const next = [...blobs];
@@ -83,7 +96,7 @@ export function MemoryForm({
   return (
     <Dialog
       title={memory ? 'Sửa kỷ niệm' : 'Kỷ niệm mới'}
-      description="Chọn nhiều ảnh và kể câu chuyện của bạn. Ảnh chỉ lưu trên trình duyệt này."
+      description="Thêm ảnh, ngày tháng, địa điểm và câu chuyện vào kỷ niệm."
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
@@ -109,6 +122,7 @@ export function MemoryForm({
                 animations: { ...memory?.animations, heart, gift },
               },
               blobs,
+              preservePhotoIds: preservedPhotoIds,
             });
             onClose();
           });
@@ -144,6 +158,25 @@ export function MemoryForm({
           />
         </div>
         <div className="upload-previews">
+          {preservedPhotoIds.map((id, i) => {
+            const photo = state!.photos.find((candidate) => candidate.id === id);
+            if (!photo) return null;
+            return (
+              <div className="upload-preview" key={id}>
+                <BlobImage photo={photo} alt={`Ảnh hiện có ${i + 1}`} />
+                <div className="actions">
+                  <Button
+                    variant="secondary"
+                    aria-label={`Xóa ảnh hiện có ${i + 1}`}
+                    disabled={action.pending}
+                    onClick={() => setPreservedPhotoIds((current) => current.filter((x) => x !== id))}
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
           {blobs.map((blob, i) => (
             <div className="upload-preview" key={i}>
               <BlobImage

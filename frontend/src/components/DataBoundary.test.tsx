@@ -11,6 +11,7 @@ test('loading, read failure and retry precede the loaded content', async () => {
   const refresh = vi.fn(async () => undefined);
   const value: NonNullable<ContextType<typeof JourneyContext>> = {
     repo: {} as JourneyRepository,
+    initialized: true,
     actor: '',
     error: '',
     busy: false,
@@ -19,6 +20,9 @@ test('loading, read failure and retry precede the loaded content', async () => {
     dispatch: async () => undefined,
     select: async () => undefined,
     create: async () => 'fixture',
+    login: async () => undefined,
+    register: async () => undefined,
+    logout: async () => undefined,
   };
   const wrap = (next: typeof value) => (
     <JourneyContext.Provider value={next}>

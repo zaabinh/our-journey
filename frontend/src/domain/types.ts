@@ -13,6 +13,8 @@ export interface Album {
   description: string;
   ownerId: Id;
   coverPhotoId?: Id;
+  version?: number;
+  role?: Role;
 }
 export interface AlbumMember {
   albumId: Id;
@@ -32,6 +34,8 @@ export interface Photo {
   blob: Blob;
   checksum: string;
   thumbnail?: Blob;
+  src?: string;
+  thumbnailSrc?: string;
 }
 export interface Memory {
   id: Id;
@@ -44,6 +48,8 @@ export interface Memory {
   note: string;
   photoIds: Id[];
   order: number;
+  version?: number;
+  published?: boolean;
   animations: Record<string, unknown>;
   legacy?: Record<string, unknown>;
 }
@@ -53,6 +59,7 @@ export interface Comment {
   userId: Id;
   text: string;
   edited: boolean;
+  version?: number;
 }
 export interface Reaction {
   memoryId: Id;
@@ -89,7 +96,14 @@ export type Command =
   | { type: 'createAlbum'; title: string; description: string }
   | { type: 'updateAlbum'; albumId: Id; title: string; description: string; coverPhotoId?: Id }
   | { type: 'deleteAlbum'; albumId: Id }
-  | { type: 'saveMemory'; albumId: Id; memoryId?: Id; draft: MemoryDraft; blobs: Blob[] }
+  | {
+      type: 'saveMemory';
+      albumId: Id;
+      memoryId?: Id;
+      draft: MemoryDraft;
+      blobs: Blob[];
+      preservePhotoIds?: Id[];
+    }
   | { type: 'deleteMemory'; memoryId: Id }
   | { type: 'reorder'; albumId: Id; ids: Id[] }
   | { type: 'createInvite'; albumId: Id; role: MemberRole; expiresAt: number }
@@ -118,6 +132,7 @@ export interface ImportPlan {
   warnings: string[];
 }
 export interface JourneyRepository {
+  readonly mode?: 'local' | 'remote';
   identity(): Promise<{ active: Id; users: User[] }>;
   selectIdentity(userId: Id): Promise<void>;
   createIdentity(name: string, email: string): Promise<Id>;

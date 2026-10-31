@@ -4,7 +4,6 @@ import { useAction, useJourney } from '../../app/JourneyProvider';
 import { canEdit, canManage, canWrite, roleOf } from '../../domain/policy';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, Card, Dropdown, EmptyState, Input, Toast } from '../../components/ui';
-import { IdentitySelector } from '../auth/IdentitySelector';
 import { LeaveAlbum } from '../members/LeaveAlbum';
 import { MemoryForm } from '../memories/MemoryForm';
 import { BlobImage } from '../memories/Photo';
@@ -174,7 +173,6 @@ export function AlbumPage() {
                 <strong>{all.length}</strong> kỷ niệm
               </span>
               <div className="album-hero-footer-actions">
-                <IdentitySelector className="album-identity-inline" />
                 <Button
                   variant="secondary"
                   className="album-scroll-cue"

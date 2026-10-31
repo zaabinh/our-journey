@@ -7,7 +7,7 @@ import { BlobImage } from '../memories/Photo';
 import { AlbumForm } from './AlbumForm';
 
 export function AlbumsPage() {
-  const { state } = useJourney(),
+  const { state, repo } = useJourney(),
     [open, setOpen] = useState(false),
     [formKey, setFormKey] = useState(0);
   const albumCount = state?.albums.length ?? 0,
@@ -113,9 +113,7 @@ export function AlbumsPage() {
             </EmptyState>
           )}
         </section>
-        <p className="album-index-footnote">
-          Dữ liệu demo chỉ được lưu trong trình duyệt này; hãy xuất bản sao để giữ an toàn.
-        </p>
+        {repo.mode !== 'remote' && <p className="album-index-footnote">Dữ liệu fixture đang được lưu cục bộ trên trình duyệt.</p>}
       </div>
     </DataBoundary>
   );

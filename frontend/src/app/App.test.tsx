@@ -1,18 +1,17 @@
 import { afterEach, expect, test } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
+import { JourneyProvider } from './JourneyProvider';
 import { App } from './App';
 afterEach(cleanup);
-test('identifies the local demo and renders a missing route', () => {
-  render(<RouterProvider router={createMemoryRouter([{ path: '*', element: <App /> }])} />);
-  expect(screen.getByText(/Dữ liệu tổng hợp/)).toBeTruthy();
-  cleanup();
-  render(
-    <RouterProvider
-      router={createMemoryRouter([{ path: '*', element: <App /> }], {
-        initialEntries: ['/missing'],
-      })}
-    />,
-  );
-  expect(screen.getByRole('heading', { name: 'Không tìm thấy trang' })).toBeTruthy();
+const renderApp = (initialEntries: string[] = ['/']) => render(<JourneyProvider><RouterProvider router={createMemoryRouter([{ path: '*', element: <App /> }], { initialEntries })} /></JourneyProvider>);
+test('renders public sign-in and registration actions without local demo messaging', async () => {
+  renderApp();
+  expect(await screen.findByRole('link', { name: /Bắt đầu lưu giữ hành trình của bạn/ })).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Đã có tài khoản' })).toBeTruthy();
+  expect(screen.queryByText(/demo local|danh tính demo|Một lời nhắn nhỏ/i)).toBeNull();
+});
+test('requires authentication for application routes', async () => {
+  renderApp(['/missing']);
+  expect(await screen.findByRole('heading', { name: 'Chào mừng bạn trở lại' })).toBeTruthy();
 });

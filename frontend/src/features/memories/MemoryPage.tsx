@@ -8,7 +8,6 @@ import { BlobImage, PhotoViewer } from './Photo';
 import { Social } from '../comments/Social';
 import { Story } from './Story';
 import { MemoryForm } from './MemoryForm';
-import { IdentitySelector } from '../auth/IdentitySelector';
 export function MemoryPage() {
   const { albumId = '', memoryId = '' } = useParams(),
     { state, actor, dispatch } = useJourney(),
@@ -40,7 +39,6 @@ export function MemoryPage() {
                 <span>Về album</span>
               </Link>
               <div className="memory-detail-tools">
-                <IdentitySelector className="memory-identity-inline" />
                 {canEdit(role, memory.authorId, actor) && (
                   <div className="memory-detail-actions">
                     <MemoryForm
