@@ -5,9 +5,15 @@ backups/
 .env.*
 !.env.example
 node_modules/
+__pycache__/
+*.py[cod]
+.venv/
 dist/
 coverage/
 test-results/
 playwright-report/
 .qa/
 /assets/img/
+
+# Archived legacy app; keep out of commits
+.old/

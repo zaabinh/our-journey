@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: our-journey-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install uv && uv sync --frozen
+    preDeployCommand: uv run alembic upgrade head
+    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/ready
+    envVars:
+      - key: OJ_DATABASE_URL
+        fromDatabase:
+          name: our-journey-db
+          property: connectionString
+      - key: OJ_ENVIRONMENT
+        value: production
+      - key: OJ_STORAGE_DRIVER
+        value: r2
+      - key: OJ_ALLOWED_ORIGINS
+        sync: false
+      - key: OJ_R2_ENDPOINT
+        sync: false
+      - key: OJ_R2_BUCKET
+        sync: false
+      - key: OJ_R2_ACCESS_KEY
+        sync: false
+      - key: OJ_R2_SECRET_KEY
+        sync: false
+databases:
+  - name: our-journey-db
+    databaseName: journey
+    user: journey
+    plan: basic-256mb
+    postgresMajorVersion: "16"
