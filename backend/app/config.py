@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -17,6 +18,16 @@ class Settings(BaseSettings):
     session_hours: int = 168
     max_upload_bytes: int = 15 * 1024 * 1024
     max_image_pixels: int = 40_000_000
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        # Render supplies a standard Postgres URL, but this project installs psycopg 3.
+        # Replace only the leading scheme; preserve credentials and query parameters.
+        for prefix in ("postgresql://", "postgres://"):
+            if value.startswith(prefix):
+                return "postgresql+psycopg://" + value[len(prefix) :]
+        return value
 
     def validate_runtime(self):
         if self.storage_driver not in {"local", "r2"}:
