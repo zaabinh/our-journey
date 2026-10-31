@@ -1,6 +1,6 @@
 # Backend progress — 31 October 2026
 
-Base: main 76342554ba4213a53bafbc274169c3629ebf3a68. Implementation is on a review branch, not deployed or merged. No real media, user export or secret was added or modified. Existing tracked legacy assets remain present in Git and history; `.gitignore` alone does not remove them. Their removal requires verified backups and a separate data-preservation step.
+Base: original main `76342554ba4213a53bafbc274169c3629ebf3a68`. Frontend and backend source are now on main at `c173957cbcef84e9bfe857d7beb2ddff9b2fc35e`; this is not a production deployment. No media, user export, or secret was added. Legacy assets were removed from the current tree and archived in local ignored `.old/`; Git history remains unchanged and still contains the old tracked data.
 
 ## Implemented
 
@@ -16,13 +16,13 @@ Base: main 76342554ba4213a53bafbc274169c3629ebf3a68. Implementation is on a revi
 
 ## Evidence
 
-Local: Python 3.12; Ruff lint + format checks PASS; compileall PASS. Alembic upgrade, metadata drift check (no changes), downgrade, upgrade PASS. Pytest: **13 passed** on PGlite 0.5.13 via PostgreSQL protocol/psycopg, including simultaneous invite redemption. PGlite multiplexing is not identical to native PostgreSQL; native PostgreSQL 16 CI is a separate required check. One third-party TestClient/httpx deprecation warning remains. Native PostgreSQL 16 CI passed on commit 3df2e2b (push and PR workflows): lint/format, Alembic drift check, 13 tests and migration downgrade/upgrade. Run: https://github.com/zaabinh/our-journey/actions/runs/41168266850 . Subsequent commits must pass the same checks.
+Earlier local: Python 3.12; Ruff lint + format checks PASS; compileall PASS. Alembic upgrade/check/downgrade/upgrade PASS. Pytest: 13 passed on PostgreSQL-protocol PGlite; CI on native PostgreSQL 16 passed at commit 3df2e2b (run https://github.com/zaabinh/our-journey/actions/runs/41168266850). Current workspace run: Ruff check and format PASS; native PostgreSQL 18 UTF-8 temporary cluster, Alembic upgrade/check and downgrade/upgrade/check PASS; pytest **13 passed**. One Starlette/httpx TestClient deprecation warning remains.
 
 ## Remaining gates
 
 B0 contract: current OpenAPI is executable contract; frontend mapping cannot be verified because main has legacy HTML only. B1–B6 have the implemented API subset above; not every planned feature is complete. Avatars/album cover, timestamps/date filter, photo reorder and crashed-pending reconciliation remain follow-up work. No account recovery or email verification is claimed.
 
-B7 BLOCKED: React source/repository interfaces are not in the current branch; needs actual frontend or a separate frontend implementation. Browser/proxy/Safari E2E has not run.
+B7 BLOCKED: React source is present, but `JourneyProvider` still uses `LocalRepository`; API auth/session and data mapping are not integrated. Browser tests against the API and Vercel proxy have not run.
 
 B8 PREPARATION ONLY: migration inventory exists; lossless original-preserving apply/resume/rollback is not executed or claimed. Real source export and owner mapping must be verified before an import implementation is applied. No production database was accessed.
 
@@ -46,3 +46,4 @@ Next: native CI → code review → complete remaining backend features → conn
 - Backend Ruff, pytest, Alembic, PostgreSQL integration, and browser integration have not passed or run: `uv` and Python dependencies are unavailable in this environment. API-to-`JourneyRepository` mapping remains unimplemented. The frontend stays on its local/demo repository.
 - Deployment files are preparation only. The Vercel rewrite still has a placeholder Render hostname; R2/Render credentials, paid resource creation, production migrations, and deployment have not been performed.
 - The legacy tracked-data audit remains a release blocker (109 private paths); do not remove, rewrite, or publish real legacy data as part of this work.
+
