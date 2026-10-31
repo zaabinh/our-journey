@@ -1,13 +1,21 @@
+# Free demo deployment. Render Free Postgres expires after 30 days.
+# R2 is billed separately if usage exceeds its free allowance.
 services:
   - type: web
     name: our-journey-api
     runtime: python
+    plan: free
     rootDir: backend
-    buildCommand: pip install uv && uv sync --frozen
-    preDeployCommand: uv run alembic upgrade head
-    startCommand: uv run uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    # Free web services do not support preDeployCommand.
+    # This single-instance demo applies migrations before starting the API.
+    startCommand: >-
+      uv run --no-sync alembic upgrade head &&
+      exec uv run --no-sync uvicorn app.main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health/ready
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.14"
       - key: OJ_DATABASE_URL
         fromDatabase:
           name: our-journey-db
@@ -26,9 +34,12 @@ services:
         sync: false
       - key: OJ_R2_SECRET_KEY
         sync: false
+
 databases:
   - name: our-journey-db
     databaseName: journey
     user: journey
-    plan: basic-256mb
+    plan: free
     postgresMajorVersion: "16"
+    # Only services in Render's private network can connect.
+    ipAllowList: []
