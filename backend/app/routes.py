@@ -186,8 +186,14 @@ def edit_album(album_id: str, body: s.AlbumEdit, user: Auth, db: Db):
 
 def queue_photo_delete(db, photo):
     photo.status = "deleting"
+    from sqlalchemy.dialects.postgresql import insert
+
     for key in (photo.object_key, photo.thumbnail_key):
-        db.add(m.StorageJob(object_key=key))
+        db.execute(
+            insert(m.StorageJob)
+            .values(id=m.uid(), object_key=key, created_at=m.now(), attempts=0, done=False)
+            .on_conflict_do_update(index_elements=["object_key"], set_={"done": False})
+        )
 
 
 @router.delete("/albums/{album_id}", status_code=204)

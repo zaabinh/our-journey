@@ -16,7 +16,7 @@ Base: main 76342554ba4213a53bafbc274169c3629ebf3a68. Implementation is on a revi
 
 ## Evidence
 
-Local: Python 3.12; Ruff lint + format checks PASS; compileall PASS. Alembic upgrade, metadata drift check (no changes), downgrade, upgrade PASS. Pytest: **13 passed** on PGlite 0.5.13 via PostgreSQL protocol/psycopg, including simultaneous invite redemption. PGlite multiplexing is not identical to native PostgreSQL; native PostgreSQL 16 CI is a separate required check. One third-party TestClient/httpx deprecation warning remains. Native PostgreSQL CI result will be reported separately on the PR.
+Local: Python 3.12; Ruff lint + format checks PASS; compileall PASS. Alembic upgrade, metadata drift check (no changes), downgrade, upgrade PASS. Pytest: **13 passed** on PGlite 0.5.13 via PostgreSQL protocol/psycopg, including simultaneous invite redemption. PGlite multiplexing is not identical to native PostgreSQL; native PostgreSQL 16 CI is a separate required check. One third-party TestClient/httpx deprecation warning remains. Native PostgreSQL 16 CI passed on commit 3df2e2b (push and PR workflows): lint/format, Alembic drift check, 13 tests and migration downgrade/upgrade. Run: https://github.com/zaabinh/our-journey/actions/runs/41168266850 . Subsequent commits must pass the same checks.
 
 ## Remaining gates
 

@@ -313,6 +313,8 @@ def test_upload_validation_failure_and_cleanup(actors, monkeypatch):
         assert len(db.scalars(select(m.StorageJob)).all()) == 2
     assert owner.call("POST", f"/memories/{mem}/publish").status_code == 409
     assert owner.call("GET", f"/memories/{mem}/photos").json()["items"] == []
+    # Failed upload already has cleanup intents: deleting its draft must be idempotent.
+    assert owner.call("DELETE", f"/memories/{mem}").status_code == 204
 
 
 def test_delete_album_blocks_photo_before_cleanup(actors):
