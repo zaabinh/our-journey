@@ -1,0 +1,48 @@
+name: Backend CI
+on:
+  push:
+    paths: ['backend/**', 'compose.backend.yaml', '.github/workflows/backend-ci.yml']
+  pull_request:
+    paths: ['backend/**', 'compose.backend.yaml', '.github/workflows/backend-ci.yml']
+permissions:
+  contents: read
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: journey
+          POSTGRES_PASSWORD: journey
+          POSTGRES_DB: journey_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U journey -d journey_test'
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      OJ_DATABASE_URL: postgresql+psycopg://journey:journey@localhost:5432/journey_test
+      OJ_ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            backend
+            .github
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run alembic upgrade head
+      - run: uv run alembic check
+      - run: uv run pytest -q
+      - name: Verify reversible initial migration on synthetic database
+        run: |
+          uv run alembic downgrade base
+          uv run alembic upgrade head

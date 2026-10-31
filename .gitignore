@@ -1,0 +1,22 @@
+# Runtime secrets and private data (legacy tracked assets remain in history).
+.env
+.env.*
+!.env.example
+.private-data/
+backups/
+exports/
+*.dump
+*.sqlite*
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+node_modules/
+dist/
+test-results/
+playwright-report/
+# Do not stage existing personal media again.
+/assets/img/
