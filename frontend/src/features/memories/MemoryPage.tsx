@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
 import { canEdit, canWrite, roleOf } from '../../domain/policy';
+import { MemoryDetailSkeleton } from '../../components/ui/skeletons';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, ConfirmDialog } from '../../components/ui';
 import { BlobImage, PhotoViewer, coverSizes } from './Photo';
@@ -25,7 +26,7 @@ export function MemoryPage() {
   const photos =
     memory?.photoIds.map((id) => state!.photos.find((p) => p.id === id)!).filter(Boolean) ?? [];
   return (
-    <DataBoundary>
+    <DataBoundary fallback={<MemoryDetailSkeleton />}>
       {!memory ? (
         <section className="memory-not-found">
           <h1>Không thể mở kỷ niệm</h1>

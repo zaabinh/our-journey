@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
 import { canEdit, canManage, canWrite, roleOf } from '../../domain/policy';
+import { CardGridSkeleton } from '../../components/ui/skeletons';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, Card, Dropdown, EmptyState, Input, Toast } from '../../components/ui';
 import { LeaveAlbum } from '../members/LeaveAlbum';
@@ -121,7 +122,7 @@ export function AlbumPage() {
   }
 
   return (
-    <DataBoundary>
+    <DataBoundary fallback={<CardGridSkeleton variant="memory" />}>
       {!album ? (
         <>
           <h1>Không thể mở album</h1>

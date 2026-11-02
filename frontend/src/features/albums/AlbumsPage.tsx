@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useJourney } from '../../app/JourneyProvider';
+import { CardGridSkeleton } from '../../components/ui/skeletons';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Button, Card, EmptyState } from '../../components/ui';
 import { BlobImage } from '../memories/Photo';
@@ -14,7 +15,7 @@ export function AlbumsPage() {
     memoryCount = state?.memories.length ?? 0;
 
   return (
-    <DataBoundary>
+    <DataBoundary fallback={<CardGridSkeleton variant="album" />}>
       <div className="album-index-page">
         <section className="album-index-hero" aria-labelledby="album-index-title">
           <div className="album-index-copy">

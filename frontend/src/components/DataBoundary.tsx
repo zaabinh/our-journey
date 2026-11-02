@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react';
 import { useJourney } from '../app/JourneyProvider';
 import { Alert, Button, Skeleton } from './ui';
-export function DataBoundary({ children }: { children: ReactNode }) {
+export function DataBoundary({
+  children,
+  fallback,
+}: {
+  children: ReactNode;
+  fallback?: ReactNode;
+}) {
   const { state, error, refresh } = useJourney();
   if (error)
     return (
@@ -12,6 +18,6 @@ export function DataBoundary({ children }: { children: ReactNode }) {
         </p>
       </Alert>
     );
-  if (!state) return <Skeleton />;
+  if (!state) return fallback ?? <Skeleton />;
   return children;
 }

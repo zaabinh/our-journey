@@ -40,3 +40,18 @@ test('loading, read failure and retry precede the loaded content', async () => {
   view.rerender(wrap({ ...value, state: emptyStore() }));
   expect(screen.getByText('Loaded fixture')).toBeTruthy();
 });
+test('renders the provided fallback while state is missing', () => {
+  const value = {
+    initialized: true,
+    error: '',
+    refresh: async () => undefined,
+  } as unknown as NonNullable<ContextType<typeof JourneyContext>>;
+  render(
+    <JourneyContext.Provider value={value}>
+      <DataBoundary fallback={<p>Custom fallback</p>}>
+        <p>Loaded</p>
+      </DataBoundary>
+    </JourneyContext.Provider>,
+  );
+  expect(screen.getByText('Custom fallback')).toBeTruthy();
+});
