@@ -1,5 +1,7 @@
 # ruff: noqa: F403,F405
+from datetime import date
 from fastapi import APIRouter
+from ..services.media import persist_photo
 from .common import *
 
 router = APIRouter()
@@ -27,11 +29,19 @@ def memories(
     user: Auth,
     db: Db,
     q: str = Query("", max_length=200),
+    date_from: date | None = None,
+    date_to: date | None = None,
     cursor: str | None = None,
     limit: int = Query(20, ge=1, le=100),
 ):
     _, role = album_access(db, album_id, user)
     query = select(m.Memory).where(m.Memory.album_id == album_id, m.Memory.deleted.is_(False))
+    if date_from and date_to and date_from > date_to:
+        fail(422, "INVALID_DATE_RANGE", "date_from must be on or before date_to")
+    if date_from:
+        query = query.where(m.Memory.date >= date_from)
+    if date_to:
+        query = query.where(m.Memory.date <= date_to)
     if role != "owner":
         query = query.where(or_(m.Memory.published.is_(True), m.Memory.author_id == user.id))
     if q:
@@ -98,9 +108,13 @@ def delete_memory(memory_id: str, user: Auth, db: Db):
     memory, album, _ = memory_access(db, memory_id, user, edit=True, lock=True)
     memory.deleted = True
     album.version += 1
-    for photo in db.scalars(
+    photos = db.scalars(
         select(m.Photo).where(m.Photo.memory_id == memory.id, m.Photo.status != "deleting")
-    ):
+    ).all()
+    photo_ids = {photo.id for photo in photos}
+    if album.cover_photo_id in photo_ids:
+        album.cover_photo_id = None
+    for photo in photos:
         queue_photo_delete(db, photo)
 
 
@@ -123,6 +137,22 @@ def photos(memory_id: str, user: Auth, db: Db):
     }
 
 
+@router.put("/memories/{memory_id}/photo-order")
+def reorder_photos(memory_id: str, body: s.PhotoReorder, user: Auth, db: Db):
+    memory, _, _ = memory_access(db, memory_id, user, edit=True, lock=True)
+    db.refresh(memory)
+    version_check(memory, body.expected_version)
+    rows = db.scalars(
+        select(m.Photo).where(m.Photo.memory_id == memory_id, m.Photo.status == "ready")
+    ).all()
+    if len(body.ids) != len(set(body.ids)) or set(body.ids) != {photo.id for photo in rows}:
+        fail(422, "INVALID_ORDER", "Send every ready photo ID exactly once")
+    positions = {photo_id: index for index, photo_id in enumerate(body.ids)}
+    for photo in rows:
+        photo.position = positions[photo.id]
+    return {"memory_version": memory.version}
+
+
 @router.post("/memories/{memory_id}/photos", status_code=201)
 def upload(memory_id: str, user: Auth, db: Db, file: UploadFile = File()):
     memory, _, _ = memory_access(db, memory_id, user, edit=True, lock=True)
@@ -134,67 +164,25 @@ def upload(memory_id: str, user: Auth, db: Db, file: UploadFile = File()):
     if count >= 10:
         fail(422, "PHOTO_LIMIT", "At most ten photos per memory")
     raw = file.file.read(settings().max_upload_bytes + 1)
-    if len(raw) > settings().max_upload_bytes:
-        fail(413, "FILE_TOO_LARGE", "Photo exceeds 15 MiB")
-    try:
-        with Image.open(BytesIO(raw)) as original:
-            if original.format not in {"JPEG", "PNG", "WEBP"}:
-                raise ValueError("Unsupported format")
-            if original.width * original.height > settings().max_image_pixels:
-                raise ValueError("Image dimensions exceed the limit")
-            original.load()
-            image = ImageOps.exif_transpose(original).convert("RGB")
-            width, height = image.size
-            # Re-encode to strip EXIF/GPS from the served image and reject polyglots.
-            output = BytesIO()
-            image.save(output, "JPEG", quality=92)
-            safe = output.getvalue()
-            image.thumbnail((640, 640))
-            thumb = BytesIO()
-            image.save(thumb, "JPEG", quality=80)
-    except (ValueError, OSError, UnidentifiedImageError, Image.DecompressionBombError):
-        fail(422, "INVALID_IMAGE", "Use a valid JPEG, PNG or WebP image within pixel limits")
-    ident = m.uid()
-    photo = m.Photo(
-        id=ident,
+    # The object is hidden while pending; re-check album authorization after storage I/O.
+    photo = persist_photo(
+        db,
+        raw,
         memory_id=memory.id,
-        object_key=f"photos/{ident}.jpg",
-        thumbnail_key=f"thumbnails/{ident}.jpg",
-        mime="image/jpeg",
-        byte_size=len(safe),
-        width=width,
-        height=height,
-        checksum=hashlib.sha256(safe).hexdigest(),
         position=count,
+        before_ready=lambda: memory_access(db, memory_id, user, edit=True, lock=True),
     )
-    db.add(photo)
-    # Durable cleanup intent exists BEFORE any storage write. A crash cannot lose orphan tracking.
-    jobs = [m.StorageJob(object_key=photo.object_key), m.StorageJob(object_key=photo.thumbnail_key)]
-    db.add_all(jobs)
-    db.commit()
-    try:
-        store = storage()
-        store.put(photo.object_key, safe, "image/jpeg")
-        store.put(photo.thumbnail_key, thumb.getvalue(), "image/jpeg")
-        # Re-check membership after slow storage I/O; removal must not publish unauthorized data.
-        memory_access(db, memory_id, user, edit=True, lock=True)
-        photo.status = "ready"
-        for job in jobs:
-            db.delete(job)
-        db.commit()
-    except Exception:
-        db.rollback()
-        photo.status = "failed"
-        db.commit()
-        fail(503, "UPLOAD_FAILED", "Upload could not complete; please retry")
-    return {"id": photo.id, "width": width, "height": height, "status": "ready"}
+    return {"id": photo.id, "width": photo.width, "height": photo.height, "status": "ready"}
 
 
 def photo_access(db, photo_id, user):
     photo = db.get(m.Photo, photo_id)
     if not photo or photo.status != "ready":
         fail(404, "NOT_FOUND", "Photo not found")
-    memory_access(db, photo.memory_id, user)
+    if photo.memory_id:
+        memory_access(db, photo.memory_id, user)
+    elif photo.owner_id != user.id:
+        fail(404, "NOT_FOUND", "Photo not found")
     return photo
 
 
@@ -241,4 +229,7 @@ def delete_photo(photo_id: str, user: Auth, db: Db):
     )
     if memory.published and count <= 1:
         fail(409, "LAST_PHOTO", "A published memory must have at least one photo")
+    album, _ = album_access(db, memory.album_id, user)
+    if album.cover_photo_id == photo.id:
+        album.cover_photo_id = None
     queue_photo_delete(db, photo)

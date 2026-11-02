@@ -37,6 +37,19 @@ def edit_album(album_id: str, body: s.AlbumEdit, user: Auth, db: Db):
     album, _ = album_access(db, album_id, user, owner=True, lock=True)
     version_check(album, body.expected_version)
     album.title, album.description = nonblank(body.title), body.description
+    if "cover_photo_id" in body.model_fields_set:
+        if body.cover_photo_id is not None:
+            photo = db.get(m.Photo, body.cover_photo_id)
+            memory = db.get(m.Memory, photo.memory_id) if photo and photo.memory_id else None
+            if (
+                not photo
+                or photo.status != "ready"
+                or not memory
+                or memory.album_id != album.id
+                or memory.deleted
+            ):
+                fail(422, "INVALID_COVER", "Cover must be a ready photo in this album")
+        album.cover_photo_id = body.cover_photo_id
     return album_json(album, "owner")
 
 

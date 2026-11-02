@@ -1,5 +1,5 @@
 import re
-from datetime import date
+from datetime import date as Date
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -40,6 +40,18 @@ class Login(Body):
     password: str = Field(min_length=1, max_length=128)
 
 
+class AccountTokenRequest(Body):
+    token: str = Field(min_length=32, max_length=200)
+
+
+class EmailRequest(Body):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class PasswordReset(AccountTokenRequest):
+    password: str = Field(min_length=10, max_length=128)
+
+
 class Profile(Body):
     display_name: str = Field(min_length=1, max_length=100)
 
@@ -51,6 +63,7 @@ class AlbumCreate(Body):
 
 class AlbumEdit(AlbumCreate):
     expected_version: int = Field(ge=1)
+    cover_photo_id: str | None = None
 
 
 Role = Literal["contributor", "viewer"]
@@ -72,7 +85,8 @@ class Redeem(Body):
 
 class MemoryCreate(Body):
     title: str = Field(min_length=1, max_length=200)
-    date: date
+    date: Date | None = None
+    date_label: str | None = Field(default=None, max_length=200)
     location: str = Field(default="", max_length=300)
     note: str = Field(default="", max_length=20000)
     animations: dict[Literal["heart", "gift"], bool] = Field(default_factory=dict)
@@ -84,6 +98,11 @@ class MemoryEdit(MemoryCreate):
 
 class Reorder(Body):
     ids: list[str] = Field(min_length=1, max_length=1000)
+    expected_version: int = Field(ge=1)
+
+
+class PhotoReorder(Body):
+    ids: list[str] = Field(min_length=1, max_length=10)
     expected_version: int = Field(ge=1)
 
 

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date as Date, datetime
 from uuid import uuid4
 
 from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
@@ -22,6 +22,8 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(64), unique=True)
     display_name: Mapped[str] = mapped_column(String(100))
     password_hash: Mapped[str] = mapped_column(Text)
+    email_verified: Mapped[bool] = mapped_column(default=True)
+    avatar_photo_id: Mapped[str | None] = mapped_column(ForeignKey("photos.id"), nullable=True)
 
 
 class Session(Base):
@@ -48,6 +50,7 @@ class Album(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     version: Mapped[int] = mapped_column(default=1)
     deleted: Mapped[bool] = mapped_column(default=False)
+    cover_photo_id: Mapped[str | None] = mapped_column(ForeignKey("photos.id"), nullable=True)
 
 
 class Member(Base):
@@ -84,7 +87,8 @@ class Memory(Base):
     album_id: Mapped[str] = mapped_column(ForeignKey("albums.id"), index=True)
     author_id: Mapped[str] = mapped_column(ForeignKey("users.id"))
     title: Mapped[str] = mapped_column(String(200))
-    date: Mapped[date]
+    date: Mapped[Date | None] = mapped_column(nullable=True)
+    date_label: Mapped[str | None] = mapped_column(Text, nullable=True)
     location: Mapped[str] = mapped_column(String(300), default="")
     note: Mapped[str] = mapped_column(Text, default="")
     animations: Mapped[dict] = mapped_column(JSON, default=dict)
@@ -97,7 +101,10 @@ class Memory(Base):
 class Photo(Base):
     __tablename__ = "photos"
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
-    memory_id: Mapped[str] = mapped_column(ForeignKey("memories.id"), index=True)
+    memory_id: Mapped[str | None] = mapped_column(
+        ForeignKey("memories.id"), index=True, nullable=True
+    )
+    owner_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
     object_key: Mapped[str] = mapped_column(String(255), unique=True)
     thumbnail_key: Mapped[str] = mapped_column(String(255), unique=True)
     mime: Mapped[str] = mapped_column(String(50))
@@ -145,3 +152,13 @@ class MigrationItem(Base):
     memory_id: Mapped[str] = mapped_column(ForeignKey("memories.id"))
     extras: Mapped[dict] = mapped_column(JSON, default=dict)
     __table_args__ = (UniqueConstraint("source", "legacy_id"),)
+
+
+class AccountToken(Base):
+    __tablename__ = "account_tokens"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    purpose: Mapped[str] = mapped_column(String(24))
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -1,6 +1,6 @@
 # Our Journey API
 
-FastAPI / PostgreSQL backend. The repository's current legacy HTML app is **not yet connected** to this API. No real personal data is seeded. API docs: `/docs`; API prefix: `/api/v1`.
+FastAPI / PostgreSQL backend used by the React HTTP repository. No real personal data is seeded. API docs: `/docs`; API prefix: `/api/v1`.
 
 ## Local development
 
@@ -32,11 +32,11 @@ The server does not trust `X-Forwarded-For`; the platform's forwarding trust mus
 5. PATCH album/memory/comment uses `expected_version`; stale writes return 409. Reorder currently **owner only**, requires all active memory IDs and album version; never send only filtered results.
 6. POST photo read-url returns an authorized local URL or 120-second R2 URL. Thumbnail and full image both private. Revoked members cannot obtain new URLs; existing signed URLs expire naturally.
 
-GET lists are bounded (memories/comments/albums cursor pagination). List members/invites is currently capped at 100 without continuation; large-group support is backlog. Search matches title/location/note; date filtering and photo reorder are backlog. Photos are re-encoded as JPEG with EXIF/GPS removed; source originals must remain in external backup for lossless migration.
+GET lists are bounded (memories/comments/albums cursor pagination). Memory listing supports `date_from`/`date_to`; ready photo order can be changed with `PUT /memories/{id}/photo-order`. List members/invites remains capped at 100 without continuation. Memories support either a date-only value or a legacy date label. Photos are re-encoded as JPEG with EXIF/GPS removed; source originals must remain in external backup for lossless migration.
 
 ## Storage and maintenance
 
-Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Bucket must be private; public access must be checked in the account. No R2 credential is sent to the browser. The production bucket/privacy check and real R2 smoke tests need the owner's account.
+Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Email verification and password recovery need `OJ_PUBLIC_WEB_URL`, `OJ_SMTP_HOST`, `OJ_SMTP_PORT`, `OJ_SMTP_USERNAME`, `OJ_SMTP_PASSWORD`, and `OJ_SMTP_FROM`; register/recovery return a service error until SMTP host/from are configured. Bucket must be private; public access must be checked in the account. No storage/email credential is sent to the browser. Real R2/SMTP smoke tests need the owner's accounts.
 
 Durable cleanup intent is inserted before writing files. A failed upload stays pending and hidden; cleanup removes orphan objects. Deletes immediately block reads but remove bytes asynchronously. Run at least hourly:
 
@@ -48,9 +48,10 @@ Jobs younger than one hour are quarantined; retries are idempotent. Expired auth
 
 ## Tests
 
-Use a dedicated empty PostgreSQL database (`OJ_DATABASE_URL`) because the suite deletes application rows. Never run tests against real user data.
+Set `OJ_TEST_DATABASE_URL` to a dedicated disposable PostgreSQL database. The test harness refuses to start without it, overrides `OJ_DATABASE_URL`, forces `OJ_ENVIRONMENT=test` (so no real SMTP is used), and truncates tables before each test. Never point it at local/production user data.
 
 ```sh
+export OJ_TEST_DATABASE_URL='postgresql+psycopg://journey_test:journey_test@localhost:5432/journey_test'
 uv run ruff check .
 uv run ruff format --check .
 uv run alembic upgrade head
@@ -62,10 +63,10 @@ Tests exercise auth/CSRF, DB rate limits, role boundaries, invite race/expiry, c
 
 ## Existing data
 
-`uv run python -m app.migration /private/export.json --media-root /private/root` inventories legacy data without modifying it, following URLs or writing to the DB. Output contains counts/checksums only. Owner mapping, original-preserving import apply/resume/rollback and database/object backup restore remain gates before real migration. Existing media already committed in Git history has **not** been removed by adding `.gitignore`.
+`uv run python -m app.import_legacy /private/export.json --source-name reviewed-export-v1 --album-id ALBUM_UUID --owner-map /private/owner-map.json` performs a dry run; add `--apply` only after reviewing its count/error report. It accepts the old record-array format and version-1 Our Journey exports, requires explicit legacy-owner-to-user mapping, reads local files/data URLs/base64 image payloads only, preserves unknown source fields in migration metadata, and retains legacy date labels when dates are missing or non-ISO. It checkpoints by source + legacy ID + payload/image hash and resumes matching partial imports. Changed payload under an imported ID is rejected. Never run apply against production until a source backup and database/object backup restore have been verified. Existing media already committed in Git history has **not** been removed by adding `.gitignore`.
 
 ## Deployment preparation
 
 Dockerfile supports Render's `$PORT`. Run `alembic upgrade head` once in a pre-deploy step, not in every web worker. Set health check `/health/ready`. R2 is the durable media store, not Render's ephemeral filesystem. Verify cookie forwarding through the Vercel proxy on Safari/iOS and other target browsers before release. No services are created, billed or deployed by this branch.
 
-Open items: React HTTP adapter/browser E2E; avatars/album cover; timestamps/date filters; reliable retry/finalize for failed upload metadata; lossless import apply; account recovery/email verification; deployment/restore rehearsal. Until these gates pass this is a reviewable backend implementation, not a completed production release.
+Open items: deployment/restore rehearsal; real SMTP and R2 smoke tests; continuation for large member/invite lists; reliable cleanup reconciliation for process crashes. Until these gates pass this is a reviewable implementation, not a completed production release.

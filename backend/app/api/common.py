@@ -86,6 +86,7 @@ def public_user(user):
         "email": user.email,
         "username": user.username,
         "display_name": user.display_name,
+        "avatar_photo_id": user.avatar_photo_id,
     }
 
 
@@ -95,6 +96,7 @@ def album_json(a, role=None):
         "owner_id": a.owner_id,
         "title": a.title,
         "description": a.description,
+        "cover_photo_id": a.cover_photo_id,
         "version": a.version,
         "role": role,
     }
@@ -109,6 +111,7 @@ def memory_json(a):
             "author_id",
             "title",
             "date",
+            "date_label",
             "location",
             "note",
             "animations",

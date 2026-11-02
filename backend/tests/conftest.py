@@ -1,9 +1,13 @@
 import os
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import text, select
 from fastapi.testclient import TestClient
 
-os.environ.setdefault("OJ_ENVIRONMENT", "test")
+TEST_DATABASE_URL = os.environ.get("OJ_TEST_DATABASE_URL")
+if not TEST_DATABASE_URL:
+    raise RuntimeError("Set OJ_TEST_DATABASE_URL to a dedicated disposable PostgreSQL database")
+os.environ["OJ_DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["OJ_ENVIRONMENT"] = "test"
 os.environ.setdefault("OJ_LOCAL_STORAGE_PATH", "/tmp/our-journey-test-uploads")
 from app.db import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
@@ -18,8 +22,8 @@ def clean_database(tmp_path, monkeypatch):
 
     settings().local_storage_path = str(tmp_path / "uploads")
     with engine.begin() as conn:
-        for table in reversed(Base.metadata.sorted_tables):
-            conn.execute(delete(table))
+        tables = ", ".join(f'"{table.name}"' for table in Base.metadata.tables.values())
+        conn.execute(text(f"TRUNCATE {tables} CASCADE"))
     yield
 
 
@@ -38,7 +42,13 @@ class Actor:
             },
         )
         assert r.status_code == 201, r.text
-        self.user = r.json()
+        from app import models as m
+        from app.db import SessionLocal
+
+        with SessionLocal.begin() as db:
+            user = db.scalar(select(m.User).where(m.User.username == name))
+            user.email_verified = True
+            self.user = {"id": user.id}
         r = self.client.post(
             "/api/v1/auth/login",
             headers=self.headers,

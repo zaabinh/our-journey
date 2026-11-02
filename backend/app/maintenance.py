@@ -3,7 +3,7 @@
 from datetime import timedelta
 from sqlalchemy import select, delete
 from .db import SessionLocal
-from .models import StorageJob, Photo, Session, RateLimit, now
+from .models import StorageJob, Photo, Session, RateLimit, AccountToken, now
 from .storage import storage
 
 
@@ -15,6 +15,7 @@ def cleanup():
     with SessionLocal() as db:
         db.execute(delete(Session).where(Session.expires_at < now()))
         db.execute(delete(RateLimit).where(RateLimit.expires_at < now()))
+        db.execute(delete(AccountToken).where(AccountToken.expires_at < now()))
         db.commit()
         # Pending intents are quarantined for an hour to avoid a live upload.
         jobs = db.scalars(
