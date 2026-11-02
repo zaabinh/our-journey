@@ -41,8 +41,7 @@ export function MemoryForm({
     ),
     [blobs, setBlobs] = useState<Blob[]>(initial),
     [preservedPhotoIds, setPreservedPhotoIds] = useState<string[]>(
-      () =>
-        memory?.photoIds.filter((id) => !!state!.photos.find((p) => p.id === id)?.src) ?? [],
+      () => memory?.photoIds.filter((id) => !!state!.photos.find((p) => p.id === id)?.src) ?? [],
     ),
     [initialPreservedPhotoIds, setInitialPreservedPhotoIds] = useState(preservedPhotoIds);
   useEffect(() => {
@@ -134,9 +133,7 @@ export function MemoryForm({
         }}
       >
         <div className="field">
-          <label htmlFor="memory-upload">
-            Ảnh JPEG/PNG/WebP (tối đa 10 ảnh, 15 MB/ảnh)
-          </label>
+          <label htmlFor="memory-upload">Ảnh JPEG/PNG/WebP (tối đa 10 ảnh, 15 MB/ảnh)</label>
           <input
             id="memory-upload"
             type="file"
@@ -170,13 +167,29 @@ export function MemoryForm({
               <div className="upload-preview" key={id}>
                 <BlobImage photo={photo} alt={`Ảnh hiện có ${i + 1}`} />
                 <div className="actions">
-                  <Button variant="secondary" aria-label={`Ảnh hiện có ${i + 1} lên trước`} disabled={i === 0 || action.pending} onClick={() => moveSaved(i, -1)}>↑</Button>
-                  <Button variant="secondary" aria-label={`Ảnh hiện có ${i + 1} xuống sau`} disabled={i === preservedPhotoIds.length - 1 || action.pending} onClick={() => moveSaved(i, 1)}>↓</Button>
+                  <Button
+                    variant="secondary"
+                    aria-label={`Ảnh hiện có ${i + 1} lên trước`}
+                    disabled={i === 0 || action.pending}
+                    onClick={() => moveSaved(i, -1)}
+                  >
+                    ↑
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    aria-label={`Ảnh hiện có ${i + 1} xuống sau`}
+                    disabled={i === preservedPhotoIds.length - 1 || action.pending}
+                    onClick={() => moveSaved(i, 1)}
+                  >
+                    ↓
+                  </Button>
                   <Button
                     variant="secondary"
                     aria-label={`Xóa ảnh hiện có ${i + 1}`}
                     disabled={action.pending}
-                    onClick={() => setPreservedPhotoIds((current) => current.filter((x) => x !== id))}
+                    onClick={() =>
+                      setPreservedPhotoIds((current) => current.filter((x) => x !== id))
+                    }
                   >
                     ×
                   </Button>

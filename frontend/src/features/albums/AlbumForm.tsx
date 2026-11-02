@@ -29,7 +29,11 @@ export function AlbumForm({
   return (
     <Dialog
       title={album ? 'Sửa album' : 'Album mới'}
-      description={album ? 'Cập nhật tên và phần giới thiệu cho album.' : 'Tạo một không gian riêng để lưu lại những câu chuyện của bạn.'}
+      description={
+        album
+          ? 'Cập nhật tên và phần giới thiệu cho album.'
+          : 'Tạo một không gian riêng để lưu lại những câu chuyện của bạn.'
+      }
       open={open}
       onOpenChange={(v) => {
         if (!v) onClose();
@@ -63,7 +67,7 @@ export function AlbumForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          maxLength={120}
+          maxLength={50}
         />
         <Textarea
           disabled={action.pending}

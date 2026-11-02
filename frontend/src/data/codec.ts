@@ -211,9 +211,18 @@ export function validateStore(s: Store) {
     if (!memories.has(c.memoryId) || !users.has(c.userId) || typeof c.edited !== 'boolean')
       throw Error('Bình luận không hợp lệ.');
     text(c.text, 5000, true);
+    if (
+      c.createdAt !== undefined &&
+      (typeof c.createdAt !== 'string' || !Number.isFinite(Date.parse(c.createdAt)))
+    )
+      throw Error('Thời gian bình luận không hợp lệ.');
   }
   for (const r of s.reactions)
-    if (!memories.has(r.memoryId) || !users.has(r.userId) || !['❤️', '😊', '🎉'].includes(r.emoji))
+    if (
+      !memories.has(r.memoryId) ||
+      !users.has(r.userId) ||
+      !['❤️', '😊', '🎉', 'moved', 'care', 'like', 'sad'].includes(r.emoji)
+    )
       throw Error('Cảm xúc không hợp lệ.');
   for (const i of s.imports)
     if (!memories.has(i.memoryId) || !/^[a-f0-9]{64}$/.test(i.hash))

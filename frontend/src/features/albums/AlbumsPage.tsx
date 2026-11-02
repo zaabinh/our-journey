@@ -69,6 +69,9 @@ export function AlbumsPage() {
             <div className="grid album-index-grid">
               {state.albums.map((album) => {
                 const memories = state.memories.filter((memory) => memory.albumId === album.id),
+                  memoryIds = new Set(memories.map((memory) => memory.id)),
+                  commentCount = state.comments.filter((c) => memoryIds.has(c.memoryId)).length,
+                  reactionCount = state.reactions.filter((r) => memoryIds.has(r.memoryId)).length,
                   cover = state.photos.find((photo) => photo.id === album.coverPhotoId);
                 return (
                   <Card className="album-index-card" key={album.id}>
@@ -88,7 +91,11 @@ export function AlbumsPage() {
                             'Một nơi nhỏ để lưu lại những khoảnh khắc đáng nhớ.'}
                         </p>
                         <div className="album-index-card-footer">
-                          <span>{memories.length} kỷ niệm</span>
+                          <span className="album-index-stats-line">
+                            <span>{memories.length} kỷ niệm</span>
+                            <span>{commentCount} bình luận</span>
+                            <span>{reactionCount} cảm xúc</span>
+                          </span>
                           <span className="album-open-icon" aria-hidden="true">
                             →
                           </span>
@@ -113,7 +120,11 @@ export function AlbumsPage() {
             </EmptyState>
           )}
         </section>
-        {repo.mode !== 'remote' && <p className="album-index-footnote">Dữ liệu fixture đang được lưu cục bộ trên trình duyệt.</p>}
+        {repo.mode !== 'remote' && (
+          <p className="album-index-footnote">
+            Dữ liệu fixture đang được lưu cục bộ trên trình duyệt.
+          </p>
+        )}
       </div>
     </DataBoundary>
   );

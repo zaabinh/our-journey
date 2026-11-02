@@ -1,7 +1,7 @@
 import { test, expect } from './harness';
 test('fixture shell and deep-link fallback', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByText(/Demo local/)).toBeVisible();
+  await expect(page.getByRole('link', { name: /Bắt đầu lưu giữ hành trình/ })).toBeVisible();
   await page.goto('/missing');
   await expect(page.getByRole('heading', { name: 'Không tìm thấy trang' })).toBeVisible();
 });
@@ -9,8 +9,9 @@ for (const width of [390, 768, 1440]) {
   test(`component keyboard and layout ${width}`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await page.goto('/');
-    await page.getByRole('link', { name: 'Album', exact: true }).click();
-    await expect(page.getByRole('link', { name: 'Album', exact: true })).toHaveAttribute(
+    const mainNav = page.getByRole('navigation', { name: 'Điều hướng chính' });
+    await mainNav.getByRole('link', { name: 'Album', exact: true }).click();
+    await expect(mainNav.getByRole('link', { name: 'Album', exact: true })).toHaveAttribute(
       'aria-current',
       'page',
     );

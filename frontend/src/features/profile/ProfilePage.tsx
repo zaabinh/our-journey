@@ -16,7 +16,46 @@ function ProfileForm() {
   return (
     <Card>
       <Avatar name={user.name} src={state!.photos.find((p) => p.id === user.avatarPhotoId)?.src} />
-      {repo.mode === 'remote' && <div className="field"><label htmlFor="profile-avatar">Ảnh đại diện</label><input id="profile-avatar" type="file" accept="image/jpeg,image/png,image/webp" disabled={action.pending} onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; void action.run(async () => { const api = repo as typeof repo & { uploadAvatar?: (file: Blob) => Promise<unknown> }; if (!api.uploadAvatar) throw Error('Tải ảnh đại diện chưa khả dụng.'); await api.uploadAvatar(file); await perform(async () => undefined); }); }} />{user.avatarPhotoId && <Button variant="secondary" type="button" disabled={action.pending} onClick={() => void action.run(async () => { const api = repo as typeof repo & { deleteAvatar?: () => Promise<unknown> }; if (!api.deleteAvatar) throw Error('Xóa ảnh đại diện chưa khả dụng.'); await api.deleteAvatar(); await perform(async () => undefined); })}>Xóa ảnh đại diện</Button>}</div>}
+      {repo.mode === 'remote' && (
+        <div className="field">
+          <label htmlFor="profile-avatar">Ảnh đại diện</label>
+          <input
+            id="profile-avatar"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            disabled={action.pending}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              void action.run(async () => {
+                const api = repo as typeof repo & {
+                  uploadAvatar?: (file: Blob) => Promise<unknown>;
+                };
+                if (!api.uploadAvatar) throw Error('Tải ảnh đại diện chưa khả dụng.');
+                await api.uploadAvatar(file);
+                await perform(async () => undefined);
+              });
+            }}
+          />
+          {user.avatarPhotoId && (
+            <Button
+              variant="secondary"
+              type="button"
+              disabled={action.pending}
+              onClick={() =>
+                void action.run(async () => {
+                  const api = repo as typeof repo & { deleteAvatar?: () => Promise<unknown> };
+                  if (!api.deleteAvatar) throw Error('Xóa ảnh đại diện chưa khả dụng.');
+                  await api.deleteAvatar();
+                  await perform(async () => undefined);
+                })
+              }
+            >
+              Xóa ảnh đại diện
+            </Button>
+          )}
+        </div>
+      )}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -57,12 +96,18 @@ export function ProfilePage() {
   return (
     <DataBoundary>
       <h1>{repo.mode === 'remote' ? 'Hồ sơ của bạn' : 'Hồ sơ demo'}</h1>
-      <p>{repo.mode === 'remote' ? 'Quản lý thông tin và ảnh đại diện tài khoản.' : 'Thông tin chỉ được lưu trên trình duyệt này.'}</p>
+      <p>
+        {repo.mode === 'remote'
+          ? 'Quản lý thông tin và ảnh đại diện tài khoản.'
+          : 'Thông tin chỉ được lưu trên trình duyệt này.'}
+      </p>
       <ProfileForm key={actor} />
       {repo.mode !== 'remote' && <DataTools />}
-      {repo.mode !== 'remote' && <p>
-        <Link to="/login">Chọn danh tính</Link> · <Link to="/signup">Tạo danh tính demo</Link>
-      </p>}
+      {repo.mode !== 'remote' && (
+        <p>
+          <Link to="/login">Chọn danh tính</Link> · <Link to="/signup">Tạo danh tính demo</Link>
+        </p>
+      )}
     </DataBoundary>
   );
 }

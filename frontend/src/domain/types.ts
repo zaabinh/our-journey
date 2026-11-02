@@ -1,7 +1,8 @@
 export type Id = string;
 export type Role = 'owner' | 'contributor' | 'viewer';
 export type MemberRole = Exclude<Role, 'owner'>;
-export type Emoji = '❤️' | '😊' | '🎉';
+// The first three values preserve existing local backups; the others map to distinct server kinds.
+export type Emoji = '❤️' | '😊' | '🎉' | 'moved' | 'care' | 'like' | 'sad';
 export interface User {
   id: Id;
   name: string;
@@ -38,6 +39,9 @@ export interface Photo {
   thumbnail?: Blob;
   src?: string;
   thumbnailSrc?: string;
+  /** Original pixel size; lets the browser pick thumbnail vs original. */
+  width?: number;
+  height?: number;
 }
 export interface Memory {
   id: Id;
@@ -62,6 +66,7 @@ export interface Comment {
   text: string;
   edited: boolean;
   version?: number;
+  createdAt?: string;
 }
 export interface Reaction {
   memoryId: Id;

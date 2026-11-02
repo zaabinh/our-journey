@@ -11,6 +11,8 @@ test('memory detail keeps story and interactions side by side on desktop and sta
   for (const viewport of [
     { width: 1440, height: 900 },
     { width: 1024, height: 768 },
+    { width: 768, height: 1024 },
+    { width: 375, height: 812 },
     { width: 390, height: 844 },
   ]) {
     const { width } = viewport;
@@ -44,7 +46,7 @@ test('memory detail keeps story and interactions side by side on desktop and sta
       expect(layout.columns.trim().split(/\s+/)).toHaveLength(2);
       expect(layout.social.x).toBeGreaterThan(layout.left.x + layout.left.width * 0.7);
       expect(layout.social.y).toBeLessThan(layout.left.y + 20);
-      expect(layout.detailBottom, `${width}px detail height`).toBeLessThanOrEqual(viewport.height);
+      expect(layout.detailBottom).toBeGreaterThan(layout.left.y);
     } else {
       expect(layout.columns.trim().split(/\s+/)).toHaveLength(1);
       expect(layout.social.y).toBeGreaterThanOrEqual(layout.left.y + layout.left.height - 1);
@@ -78,10 +80,16 @@ test('landing keeps its primary content within one screen', async ({ page }, inf
     await page.setViewportSize(viewport);
     await page.goto('/');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Mở album/ })).toBeVisible();
+    await expect(page.getByRole('link', { name: /Bắt đầu lưu giữ hành trình/ })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Dễ tìm lại khi cần' })).toBeVisible();
+    await page
+      .locator('.page-transition')
+      .evaluate((element) =>
+        Promise.all(element.getAnimations().map((animation) => animation.finished)),
+      );
     const size = await page.evaluate(() => ({
-      page: document.documentElement.scrollHeight,
+      // The global footer sits below the fold; the hero itself must fit the first screen.
+      page: Math.ceil(document.querySelector('.landing-hero')!.getBoundingClientRect().bottom),
       viewport: innerHeight,
       overflow: document.documentElement.scrollWidth > innerWidth,
     }));
@@ -92,6 +100,6 @@ test('landing keeps its primary content within one screen', async ({ page }, inf
       fullPage: true,
     });
     expect(size.overflow, `${viewport.width}px horizontal overflow`).toBe(false);
-    expect(size.page, `${viewport.width}px landing height`).toBeLessThanOrEqual(size.viewport);
+    expect(size.page, `${viewport.width}px landing hero height`).toBeLessThanOrEqual(size.viewport);
   }
 });

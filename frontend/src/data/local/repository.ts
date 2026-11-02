@@ -53,6 +53,7 @@ function addPhotos(s: Store, photos: Photo[]) {
   for (const p of photos) if (!s.photos.some((x) => x.id === p.id)) s.photos.push(p);
 }
 export class LocalRepository implements JourneyRepository {
+  readonly mode = 'local' as const;
   private db?: Promise<IDBDatabase>;
   private seed?: Promise<Store>;
   constructor(
@@ -266,7 +267,7 @@ export class LocalRepository implements JourneyRepository {
           s.albums.push({
             id,
             ownerId: actor,
-            title: text(command.title, 120, true),
+            title: text(command.title, 50, true),
             description: text(command.description, 2000),
           });
           s.members.push({ albumId: id, userId: actor, role: 'owner' });
@@ -275,7 +276,7 @@ export class LocalRepository implements JourneyRepository {
         case 'updateAlbum': {
           owner(command.albumId);
           const a = s.albums.find((a) => a.id === command.albumId)!;
-          a.title = text(command.title, 120, true);
+          a.title = text(command.title, 50, true);
           a.description = text(command.description, 2000);
           a.coverPhotoId = command.coverPhotoId;
           break;
@@ -410,6 +411,7 @@ export class LocalRepository implements JourneyRepository {
             userId: actor,
             text: text(command.text, 5000, true),
             edited: false,
+            createdAt: new Date().toISOString(),
           });
           return id;
         }
@@ -433,7 +435,8 @@ export class LocalRepository implements JourneyRepository {
         }
         case 'react': {
           writeMemory(command.memoryId);
-          if (!['❤️', '😊', '🎉'].includes(command.emoji)) throw Error('Cảm xúc không hợp lệ.');
+          if (!['❤️', '😊', '🎉', 'moved', 'care', 'like', 'sad'].includes(command.emoji))
+            throw Error('Cảm xúc không hợp lệ.');
           const current = s.reactions.find(
             (r) => r.memoryId === command.memoryId && r.userId === actor,
           );

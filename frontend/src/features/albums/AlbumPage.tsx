@@ -6,6 +6,7 @@ import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, Card, Dropdown, EmptyState, Input, Toast } from '../../components/ui';
 import { LeaveAlbum } from '../members/LeaveAlbum';
 import { MemoryForm } from '../memories/MemoryForm';
+import { memoryDate } from '../../domain/date';
 import { BlobImage } from '../memories/Photo';
 
 export function AlbumPage() {
@@ -36,7 +37,11 @@ export function AlbumPage() {
           v.toLocaleLowerCase().includes(q),
         ),
       )
-      .filter((m) => (!dateFrom || (!!m.date && m.date >= dateFrom)) && (!dateTo || (!!m.date && m.date <= dateTo)))
+      .filter(
+        (m) =>
+          (!dateFrom || (!!m.date && m.date >= dateFrom)) &&
+          (!dateTo || (!!m.date && m.date <= dateTo)),
+      )
       .sort((a, b) =>
         sort === 'date'
           ? (b.date || b.dateLabel || '').localeCompare(a.date || a.dateLabel || '')
@@ -220,8 +225,26 @@ export function AlbumPage() {
                       setLimit(12);
                     }}
                   />
-                  <Input label="Từ ngày" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => { setDateFrom(event.target.value); setLimit(12); }} />
-                  <Input label="Đến ngày" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => { setDateTo(event.target.value); setLimit(12); }} />
+                  <Input
+                    label="Từ ngày"
+                    type="date"
+                    value={dateFrom}
+                    max={dateTo || undefined}
+                    onChange={(event) => {
+                      setDateFrom(event.target.value);
+                      setLimit(12);
+                    }}
+                  />
+                  <Input
+                    label="Đến ngày"
+                    type="date"
+                    value={dateTo}
+                    min={dateFrom || undefined}
+                    onChange={(event) => {
+                      setDateTo(event.target.value);
+                      setLimit(12);
+                    }}
+                  />
                   <Dropdown
                     label="Sắp xếp"
                     value={sort}
@@ -305,15 +328,22 @@ export function AlbumPage() {
                   </Link>
                   <div className="album-memory-body">
                     <p className="album-memory-meta">
-                      <span aria-hidden="true">♡</span>{' '}
-                      {memory.dateLabel?.trim() || memory.date || 'Chưa ghi rõ ngày'}
+                      <span aria-hidden="true">♡</span> {memoryDate(memory)}
                       {memory.location && <span> · {memory.location}</span>}
                     </p>
                     {memory.note && (
                       <p className="album-memory-note">{memory.note.slice(0, 160)}</p>
                     )}
                     <div className="album-memory-footer">
-                      <span>{memory.photoIds.length} ảnh</span>
+                      <span className="album-index-stats-line">
+                        <span>{memory.photoIds.length} ảnh</span>
+                        <span>
+                          {state!.comments.filter((c) => c.memoryId === memory.id).length} bình luận
+                        </span>
+                        <span>
+                          {state!.reactions.filter((r) => r.memoryId === memory.id).length} cảm xúc
+                        </span>
+                      </span>
                       {canReorder && (
                         <div className="album-keyboard-order" aria-label="Sắp xếp bằng bàn phím">
                           <Button

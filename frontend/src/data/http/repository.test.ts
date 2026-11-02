@@ -6,6 +6,36 @@ const json = (value: unknown, status = 200) => new Response(JSON.stringify(value
 
 afterEach(() => vi.unstubAllGlobals());
 
+test('caches a signed-in snapshot briefly and refreshes it after an avatar change', async () => {
+  const calls: { path: string; method: string }[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), 'http://local.test').pathname.replace('/api/v1', '');
+      calls.push({ path, method: init?.method ?? 'GET' });
+      if (path === '/auth/session')
+        return json({
+          user: { id: 'u1', email: 'u@example.test', display_name: 'Owner', avatar_photo_id: 'p1' },
+        });
+      if (path === '/auth/csrf') return json({ csrf_token: 'csrf' });
+      if (path === '/photos/p1/read-url') return json({ url: '/avatar.jpg' });
+      if (path === '/albums') return json({ items: [], next_cursor: null });
+      if (path === '/users/me/avatar') return json({ id: 'p1' });
+      throw new Error(`Unhandled request ${path}`);
+    }),
+  );
+  const repo = new HttpRepository();
+  await repo.read('u1');
+  await repo.read('u1');
+  expect(calls.filter((call) => call.path === '/albums')).toHaveLength(1);
+  expect(calls.filter((call) => call.path === '/photos/p1/read-url')).toEqual([
+    { path: '/photos/p1/read-url', method: 'POST' },
+  ]);
+  await repo.uploadAvatar(new Blob(['avatar']));
+  await repo.read('u1');
+  expect(calls.filter((call) => call.path === '/albums')).toHaveLength(2);
+});
+
 test('read drains album, memory, invitation, and comment cursors and restores social state', async () => {
   const calls: string[] = [];
   vi.stubGlobal(
@@ -192,4 +222,70 @@ test('invite preview, redemption, and explicit memory publishing call their serv
     ['/invites/redeem', 'POST'],
     ['/memories/m1/publish', 'POST'],
   ]);
+});
+
+test('failed reaction request leaves prior choice intact and does not claim success', async () => {
+  const requests: { path: string; method: string; body?: string }[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), 'http://local.test').pathname.replace('/api/v1', '');
+      requests.push({ path, method: init?.method ?? 'GET', body: init?.body?.toString() });
+      if (path === '/auth/session')
+        return json({ user: { id: 'u1', email: 'u@example.test', display_name: 'Owner' } });
+      if (path === '/auth/csrf') return json({ csrf_token: 'csrf' });
+      if (path === '/albums')
+        return json({
+          items: [
+            {
+              id: 'a1',
+              owner_id: 'u1',
+              title: 'Album',
+              description: '',
+              version: 1,
+              role: 'owner',
+            },
+          ],
+          next_cursor: null,
+        });
+      if (path === '/albums/a1/members')
+        return json({ items: [{ user_id: 'u1', display_name: 'Owner', role: 'owner' }] });
+      if (path === '/albums/a1/invites') return json({ items: [], next_cursor: null });
+      if (path === '/albums/a1/memories')
+        return json({
+          items: [
+            {
+              id: 'm1',
+              album_id: 'a1',
+              author_id: 'u1',
+              title: 'Memory',
+              date: null,
+              location: '',
+              note: '',
+              position: 0,
+              version: 1,
+              published: true,
+              animations: {},
+            },
+          ],
+          next_cursor: null,
+        });
+      if (path === '/memories/m1/photos') return json({ items: [] });
+      if (path === '/memories/m1/comments') return json({ items: [], next_cursor: null });
+      if (path === '/memories/m1/reactions')
+        return json({ items: [{ user_id: 'u1', kind: 'heart' }] });
+      if (path === '/memories/m1/reaction') return json({ error: { message: 'Try again' } }, 503);
+      throw new Error(`Unhandled request ${path}`);
+    }),
+  );
+  const repo = new HttpRepository();
+  const state = await repo.read('u1');
+  await expect(
+    repo.dispatch('u1', { type: 'react', memoryId: 'm1', emoji: 'moved' }),
+  ).rejects.toThrow('Try again');
+  expect(state.reactions).toEqual([{ memoryId: 'm1', userId: 'u1', emoji: '❤️' }]);
+  expect(requests.find((request) => request.path === '/memories/m1/reaction')).toMatchObject({
+    method: 'PUT',
+    body: '{"kind":"moved"}',
+  });
 });

@@ -7,7 +7,7 @@ async function identity(page: Page, value: string) {
 }
 for (const actor of ['owner', 'contributor', 'viewer', 'outsider']) {
   test(`local UX role matrix/deep links: ${actor}`, async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/albums');
     await identity(page, actor);
     await page.goto(memory);
     if (actor === 'outsider') {
@@ -25,15 +25,13 @@ for (const actor of ['owner', 'contributor', 'viewer', 'outsider']) {
       await expect(page.getByLabel('Bình luận mới', { exact: true })).toHaveCount(
         actor === 'viewer' ? 0 : 1,
       );
-      await expect(
-        page.getByRole('group', { name: 'Cảm xúc', exact: true }).getByRole('button'),
-      ).toHaveCount(actor === 'viewer' ? 0 : 3);
+      await expect(page.getByRole('button', { name: 'Yêu thích' })).toHaveCount(
+        actor === 'viewer' ? 0 : 1,
+      );
     }
     await page.goto(settings);
     if (actor === 'owner') {
-      await expect(
-        page.getByRole('button', { name: 'Tạo lời mời demo', exact: true }),
-      ).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Tạo lời mời', exact: true })).toBeVisible();
       await expect(
         page.getByRole('button', { name: 'Xóa thành viên Chủ album demo', exact: true }),
       ).toHaveCount(0);
@@ -41,12 +39,31 @@ for (const actor of ['owner', 'contributor', 'viewer', 'outsider']) {
       await expect(
         page.getByRole('heading', { name: 'Không có quyền quản lý album', exact: true }),
       ).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Tạo lời mời demo', exact: true })).toHaveCount(
-        0,
-      );
+      await expect(page.getByRole('button', { name: 'Tạo lời mời', exact: true })).toHaveCount(0);
     }
   });
 }
+test('one-click reaction bar works from the keyboard and toggles a distinct moved reaction', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto(memory);
+  const reactions = page.getByRole('group', { name: 'Cảm xúc', exact: true });
+  await reactions.getByRole('button', { name: 'Yêu thích' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(reactions.getByRole('button', { name: 'Yêu thích: 1' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await reactions.getByRole('button', { name: 'Xúc động' }).click();
+  await expect(page.getByLabel('Xúc động: 1')).toBeVisible();
+  await expect(page.getByLabel('Yêu thích: 1')).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByLabel('Xúc động: 1')).toBeVisible();
+  await reactions.getByRole('button', { name: 'Xúc động: 1' }).click();
+  await expect(page.getByLabel('Xúc động: 1')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
 test('comment author editing/plain text and owner moderation; reaction toggle/replace persists', async ({
   page,
 }) => {
@@ -55,39 +72,33 @@ test('comment author editing/plain text and owner moderation; reaction toggle/re
   await page
     .getByLabel('Bình luận mới', { exact: true })
     .fill('<img src=x onerror=alert(1)> Tiếng Việt 🌷\nLine two');
-  await page.getByRole('button', { name: 'Đăng bình luận', exact: true }).click();
+  await page.getByRole('button', { name: 'Gửi bình luận', exact: true }).click();
   await expect(page.locator('.comment-text')).toContainText('<img src=x onerror=alert(1)>');
   await expect(page.locator('.comment img')).toHaveCount(0);
+  await page.getByRole('button', { name: /Tùy chọn bình luận/ }).click();
   await page.getByRole('button', { name: 'Sửa bình luận', exact: true }).click();
   await page.getByLabel('Sửa bình luận', { exact: true }).fill('Edited Unicode 🌷');
   await page.getByRole('button', { name: 'Lưu bình luận', exact: true }).click();
-  await expect(page.getByText('Đã chỉnh sửa', { exact: true })).toBeVisible();
+  await expect(page.locator('.comment-author')).toContainText('Đã chỉnh sửa');
   const reactions = page.getByRole('group', { name: 'Cảm xúc', exact: true });
-  await reactions.getByRole('button', { name: '❤️ 0', exact: true }).click();
-  await expect(reactions.getByRole('button', { name: '❤️ 1', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
-  await reactions.getByRole('button', { name: '❤️ 1', exact: true }).click();
-  await expect(reactions.getByRole('button', { name: '❤️ 0', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  );
-  await reactions.getByRole('button', { name: '😊 0', exact: true }).click();
-  await reactions.getByRole('button', { name: '❤️ 0', exact: true }).click();
-  await expect(reactions.getByRole('button', { name: '😊 0', exact: true })).toBeVisible();
-  await expect(reactions.getByRole('button', { name: '❤️ 1', exact: true })).toBeVisible();
+  await reactions.getByRole('button', { name: 'Yêu thích' }).click();
+  await expect(reactions.getByLabel('Yêu thích: 1')).toBeVisible();
+  await reactions.getByRole('button', { name: 'Yêu thích' }).click();
+  await expect(reactions.getByLabel('Yêu thích: 1')).toHaveCount(0);
+  await reactions.getByRole('button', { name: 'Vui quá' }).click();
+  await reactions.getByRole('button', { name: 'Yêu thích' }).click();
+  await expect(reactions.getByLabel('Vui quá: 1')).toHaveCount(0);
+  await expect(reactions.getByLabel('Yêu thích: 1')).toBeVisible();
   await page.reload();
   await expect(page.locator('.comment-text')).toHaveText('Edited Unicode 🌷');
-  await expect(reactions.getByRole('button', { name: '❤️ 1', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(reactions.getByLabel('Yêu thích: 1')).toBeVisible();
   await identity(page, 'owner');
+  await page.getByRole('button', { name: /Tùy chọn bình luận/ }).click();
   await expect(page.getByRole('button', { name: 'Sửa bình luận', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Xóa bình luận', exact: true }).click();
   await page.getByRole('button', { name: 'Hủy', exact: true }).click();
   await expect(page.locator('.comment-text')).toBeVisible();
+  await page.getByRole('button', { name: /Tùy chọn bình luận/ }).click();
   await page.getByRole('button', { name: 'Xóa bình luận', exact: true }).click();
   await page.getByRole('button', { name: 'Xác nhận xóa', exact: true }).click();
   await expect(page.locator('.comment')).toHaveCount(0);
@@ -98,12 +109,12 @@ test('same-store invitation joins once, already-member, revoke and expiry; inval
   browserName,
 }) => {
   await page.goto(settings);
-  await page.getByRole('button', { name: 'Tạo lời mời demo', exact: true }).click();
-  const link = await page.getByLabel('Liên kết demo', { exact: true }).inputValue();
+  await page.getByRole('button', { name: 'Tạo lời mời', exact: true }).click();
+  const link = await page.getByLabel('Liên kết mời', { exact: true }).inputValue();
   await page.goto(link);
   await expect(page.getByText('Bạn đã là thành viên album này.', { exact: true })).toBeVisible();
   await identity(page, 'outsider');
-  await page.getByRole('button', { name: 'Tham gia trên thiết bị này', exact: true }).click();
+  await page.getByRole('button', { name: 'Tham gia album', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Những ngày bên nhau', exact: true }),
   ).toBeVisible();
@@ -118,9 +129,9 @@ test('same-store invitation joins once, already-member, revoke and expiry; inval
   await page.goto(link);
   await expect(page.getByRole('alert')).toHaveText('Lời mời đã được thu hồi.');
   await page.goto(settings);
-  await page.getByRole('button', { name: 'Tạo lời mời demo', exact: true }).click();
+  await page.getByRole('button', { name: 'Tạo lời mời', exact: true }).click();
   await expect(page.locator('.invites > li')).toHaveCount(2);
-  const expiryLink = await page.getByLabel('Liên kết demo', { exact: true }).last().inputValue();
+  const expiryLink = await page.getByLabel('Liên kết mời', { exact: true }).last().inputValue();
   await page.clock.setFixedTime(new Date(Date.now() + 8 * 86400000));
   await page.goto(expiryLink);
   await expect(page.getByRole('alert')).toHaveText('Lời mời đã hết hạn.');
@@ -128,7 +139,7 @@ test('same-store invitation joins once, already-member, revoke and expiry; inval
     external = await other.newPage();
   try {
     await external.goto(link);
-    await expect(external.getByRole('alert')).toHaveText('Mã mời không tồn tại trên thiết bị này.');
+    await expect(external.getByRole('alert')).toHaveText('Liên kết hoặc mã mời không hợp lệ.');
   } finally {
     await other.close();
   }

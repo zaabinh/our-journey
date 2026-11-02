@@ -10,7 +10,10 @@ import {
 import type { Command, Id, JourneyRepository, Store } from '../domain/types';
 import { LocalRepository } from '../data/local/repository';
 import { HttpRepository } from '../data/http/repository';
-const repository: JourneyRepository = import.meta.env.MODE === 'test' || import.meta.env.VITE_DATA_MODE === 'local' ? new LocalRepository() : new HttpRepository();
+const repository: JourneyRepository =
+  import.meta.env.MODE === 'test' || import.meta.env.VITE_DATA_MODE === 'local'
+    ? new LocalRepository()
+    : new HttpRepository();
 interface Journey {
   repo: JourneyRepository;
   state?: Store;
@@ -24,7 +27,12 @@ interface Journey {
   select: (id: Id) => Promise<void>;
   create: (name: string, email: string) => Promise<Id>;
   login: (identifier: string, password: string) => Promise<void>;
-  register: (input: { email: string; username: string; display_name: string; password: string }) => Promise<void>;
+  register: (input: {
+    email: string;
+    username: string;
+    display_name: string;
+    password: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
 }
 export const JourneyContext = createContext<Journey | null>(null);
@@ -97,20 +105,32 @@ export function JourneyProvider({
             : Promise.resolve(),
         create: (name, email) => mutate(() => repo.createIdentity(name, email)),
         login: async (identifier, password) => {
-          const auth = repo as JourneyRepository & { login?: (identifier: string, password: string) => Promise<void> };
+          const auth = repo as JourneyRepository & {
+            login?: (identifier: string, password: string) => Promise<void>;
+          };
           if (!auth.login) throw Error('Đăng nhập không khả dụng.');
           await auth.login(identifier, password);
           await refresh();
         },
         register: async (input) => {
-          const auth = repo as JourneyRepository & { register?: (input: { email: string; username: string; display_name: string; password: string }) => Promise<void> };
+          const auth = repo as JourneyRepository & {
+            register?: (input: {
+              email: string;
+              username: string;
+              display_name: string;
+              password: string;
+            }) => Promise<void>;
+          };
           if (!auth.register) throw Error('Đăng ký không khả dụng.');
           await auth.register(input);
         },
         logout: async () => {
           const auth = repo as JourneyRepository & { logout?: () => Promise<void> };
           if (!auth.logout) throw Error('Đăng xuất không khả dụng.');
-          await auth.logout(); setState(undefined); setActor(''); setError('');
+          await auth.logout();
+          setState(undefined);
+          setActor('');
+          setError('');
         },
       }}
     >

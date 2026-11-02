@@ -1,17 +1,20 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
-import { canEdit, roleOf } from '../../domain/policy';
+import { canEdit, canWrite, roleOf } from '../../domain/policy';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, ConfirmDialog } from '../../components/ui';
-import { BlobImage, PhotoViewer } from './Photo';
-import { Social } from '../comments/Social';
+import { BlobImage, PhotoViewer, coverSizes } from './Photo';
+import { CommentsPanel } from '../comments/CommentsPanel';
+import { ReactionBar } from '../comments/ReactionBar';
 import { Story } from './Story';
 import { MemoryForm } from './MemoryForm';
+import { memoryDate } from '../../domain/date';
 export function MemoryPage() {
   const { albumId = '', memoryId = '' } = useParams(),
     { state, actor, dispatch } = useJourney(),
     action = useAction(),
+    reactionAction = useAction(),
     navigate = useNavigate();
   const memory = state?.memories.find((m) => m.id === memoryId && m.albumId === albumId),
     role = roleOf(state?.members ?? [], albumId, actor);
@@ -73,7 +76,9 @@ export function MemoryPage() {
               )}
               <h1>{memory.title}</h1>
               <div className="memory-detail-meta" aria-label="Thông tin kỷ niệm">
-                <span>{memory.dateLabel?.trim() || memory.date || 'Chưa ghi rõ ngày'}</span>
+                <time dateTime={memory.dateLabel?.trim() ? undefined : memory.date || undefined}>
+                  {memoryDate(memory)}
+                </time>
                 {memory.location && (
                   <>
                     <span aria-hidden="true">·</span>
@@ -86,32 +91,61 @@ export function MemoryPage() {
 
           <div className="memory-detail-content">
             <div className="memory-detail-left">
-              {photos.length > 0 && (
-                <section className="memory-media-section" aria-label="Ảnh trong kỷ niệm">
-                  <div className="memory-section-heading">
-                    <span className="album-kicker">NHỮNG KHOẢNH KHẮC</span>
-                    <span className="memory-photo-count">{photos.length} ảnh</span>
-                  </div>
-                  <div className="grid photo-grid memory-detail-photo-grid">
-                    {photos.map((p, i) => (
-                      <button
-                        className="photo-button"
-                        key={`${p.id}-${i}`}
-                        onClick={(event) => {
-                          event.currentTarget.focus();
-                          setIndex(i);
-                        }}
-                        aria-label={`Xem ảnh ${i + 1}`}
-                      >
-                        <BlobImage photo={p} alt={`Ảnh ${i + 1} của ${memory.title}`} />
-                        <span className="memory-photo-number">
-                          {String(i + 1).padStart(2, '0')}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              )}
+              <section className="memory-media-section" aria-label="Ảnh và cảm xúc của kỷ niệm">
+                {photos.length > 0 && (
+                  <>
+                    <div className="memory-section-heading">
+                      <span className="album-kicker">NHỮNG KHOẢNH KHẮC</span>
+                      <span className="memory-photo-count">{photos.length} ảnh</span>
+                    </div>
+                    <div
+                      className={`grid photo-grid memory-detail-photo-grid${photos.length === 1 ? ' single-photo' : ''}`}
+                    >
+                      {photos.map((p, i) => (
+                        <button
+                          className="photo-button"
+                          key={`${p.id}-${i}`}
+                          onClick={(event) => {
+                            event.currentTarget.focus();
+                            setIndex(i);
+                          }}
+                          aria-label={`Xem ảnh ${i + 1}`}
+                        >
+                          <BlobImage
+                            photo={p}
+                            alt={`Ảnh ${i + 1} của ${memory.title}`}
+                            sizes={
+                              photos.length === 1
+                                ? coverSizes(p, 4 / 3, [
+                                    ['(max-width: 900px)', '92vw'],
+                                    ['', 'min(52vw, 700px)'],
+                                  ])
+                                : coverSizes(p, 1, [
+                                    ['(max-width: 480px)', '92vw'],
+                                    ['(max-width: 900px)', '46vw'],
+                                    ['', 'min(26vw, 350px)'],
+                                  ])
+                            }
+                          />
+                          <span className="memory-photo-number">
+                            {String(i + 1).padStart(2, '0')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+                <ReactionBar
+                  reactions={state!.reactions.filter((reaction) => reaction.memoryId === memoryId)}
+                  actor={actor}
+                  canReact={canWrite(role)}
+                  pending={reactionAction.pending}
+                  onSelect={(emoji) =>
+                    void reactionAction.run(() => dispatch({ type: 'react', memoryId, emoji }))
+                  }
+                />
+                {reactionAction.error && <Alert>{reactionAction.error}</Alert>}
+              </section>
               <section className="memory-story-panel">
                 <span className="album-kicker">CÂU CHUYỆN CỦA CHÚNG MÌNH</span>
                 <Story text={memory.note || 'Kỷ niệm này chưa có lời nhắn.'} />
@@ -139,7 +173,7 @@ export function MemoryPage() {
                 </div>
               </section>
             </div>
-            <Social key={actor} albumId={albumId} memoryId={memoryId} />
+            <CommentsPanel key={actor} albumId={albumId} memoryId={memoryId} />
           </div>
           <ConfirmDialog
             open={remove}

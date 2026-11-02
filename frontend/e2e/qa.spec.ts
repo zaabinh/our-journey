@@ -254,7 +254,7 @@ test('image load failure and long Unicode content stay readable', async ({ page 
   await page
     .getByLabel('Bình luận mới', { exact: true })
     .fill('Một câu chuyện dài 🌷 '.repeat(150));
-  await page.getByRole('button', { name: 'Đăng bình luận', exact: true }).click();
+  await page.getByRole('button', { name: 'Gửi bình luận', exact: true }).click();
   await expect(page.locator('.comment-text')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });

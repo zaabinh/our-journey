@@ -134,14 +134,14 @@ export function LoginPage() {
           <p className="auth-switch">
             <Link to="/login?verify=1">Gửi lại email xác minh</Link>
           </p>
+          <p className="auth-switch">
+            Chưa có tài khoản?{' '}
+            <Link to="/signup" state={{ from: destination }}>
+              Đăng ký
+            </Link>
+          </p>
         </div>
         {params.get('verify') === '1' && <ResendVerification />}
-        <p className="auth-switch">
-          Chưa có tài khoản?{' '}
-          <Link to="/signup" state={{ from: destination }}>
-            Đăng ký
-          </Link>
-        </p>
       </Card>
     </section>
   );
@@ -238,9 +238,11 @@ export function SignupPage() {
             {action.pending ? 'Đang tạo tài khoản…' : 'Tạo tài khoản'}
           </Button>
         </form>
-        <p className="auth-switch">
-          Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
-        </p>
+        <div className="auth-account-links">
+          <p className="auth-switch">
+            Đã có tài khoản? <Link to="/login">Đăng nhập</Link>
+          </p>
+        </div>
       </Card>
     </section>
   );
@@ -379,9 +381,11 @@ export function AccountLinkPage({ mode }: { mode: 'verify' | 'forgot' | 'reset' 
                 : 'Mật khẩu đã được cập nhật. Hãy đăng nhập lại.'}
           </p>
         )}
-        <p className="auth-switch">
-          <Link to="/login">Quay lại đăng nhập</Link>
-        </p>
+        <div className="auth-account-links">
+          <p className="auth-switch">
+            <Link to="/login">Quay lại đăng nhập</Link>
+          </p>
+        </div>
       </Card>
     </section>
   );

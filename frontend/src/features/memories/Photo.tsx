@@ -6,14 +6,23 @@ export function BlobImage({
   photo,
   alt,
   full = false,
+  sizes,
 }: {
   blob?: Blob;
   photo?: Photo;
   alt: string;
   full?: boolean;
+  /** Displayed slot width (CSS `sizes`); enables picking the original when the thumbnail is too small. */
+  sizes?: string;
 }) {
-  const blob = photo ? (full ? photo.blob : (photo.thumbnail ?? photo.blob)) : provided;
+  // Local photos have no dimensions; use the original blob when a slot size is requested.
+  const wantFull = full || (!!sizes && !photo?.src);
+  const blob = photo ? (wantFull ? photo.blob : (photo.thumbnail ?? photo.blob)) : provided;
   const remoteSrc = photo ? (full ? photo.src : (photo.thumbnailSrc ?? photo.src)) : undefined;
+  const srcSet =
+    sizes && photo?.src && photo.thumbnailSrc && photo.width && photo.height
+      ? `${photo.thumbnailSrc} ${thumbnailWidth(photo.width, photo.height)}w, ${photo.src} ${photo.width}w`
+      : undefined;
   const [url, setUrl] = useState(''),
     [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -40,9 +49,11 @@ export function BlobImage({
       key={url}
       className={full ? 'photo-full' : 'photo-thumb'}
       src={remoteSrc ?? url}
+      srcSet={srcSet}
+      sizes={srcSet ? sizes : undefined}
       alt={alt}
-      width="640"
-      height="480"
+      width={photo?.width ?? 640}
+      height={photo?.height ?? 480}
       loading={full ? 'eager' : 'lazy'}
       decoding="async"
       onError={() => setFailed(true)}
@@ -50,6 +61,21 @@ export function BlobImage({
   ) : (
     <div className="photo-placeholder" aria-label="Đang tải ảnh" />
   );
+}
+// Server thumbnails fit inside 640×640 (Pillow `thumbnail`), keeping the aspect ratio.
+export const thumbnailWidth = (width: number, height: number) =>
+  Math.round(width * Math.min(1, 640 / Math.max(width, height)));
+
+/**
+ * CSS `sizes` for a photo cover-cropped into a frame: a photo wider than the frame
+ * renders wider than its slot, so it needs proportionally more pixels.
+ */
+export function coverSizes(photo: Photo, frameAspect: number, slots: [string, string][]) {
+  const scale =
+    photo.width && photo.height ? Math.max(1, photo.width / photo.height / frameAspect) : 1;
+  return slots
+    .map(([media, width]) => `${media} calc(${width} * ${scale.toFixed(3)})`.trim())
+    .join(', ');
 }
 export function PhotoViewer({
   photos,

@@ -49,9 +49,10 @@ type CommentDto = {
   body: string;
   edited: boolean;
   version: number;
+  created_at?: string | null;
 };
 type ReactionDto = { user_id: string; kind: string };
-type PhotoDto = { id: string; checksum: string };
+type PhotoDto = { id: string; checksum: string; width: number; height: number };
 
 const empty = (identity = ''): Store => ({
   version: 1,
@@ -66,13 +67,30 @@ const empty = (identity = ''): Store => ({
   reactions: [],
   imports: [],
 });
-const emojiByKind: Record<string, Emoji> = { heart: '❤️', like: '❤️', happy: '😊', wow: '🎉' };
-const kindByEmoji: Record<Emoji, string> = { '❤️': 'heart', '😊': 'happy', '🎉': 'wow' };
+const emojiByKind: Record<string, Emoji> = {
+  heart: '❤️',
+  like: 'like',
+  happy: '😊',
+  wow: '🎉',
+  sad: 'sad',
+  moved: 'moved',
+  care: 'care',
+};
+const kindByEmoji: Record<Emoji, string> = {
+  '❤️': 'heart',
+  '😊': 'happy',
+  '🎉': 'wow',
+  moved: 'moved',
+  care: 'care',
+  like: 'like',
+  sad: 'sad',
+};
 
 export class HttpRepository implements JourneyRepository {
   readonly mode = 'remote' as const;
   private csrf = '';
   private current?: Store;
+  private cacheExpires = 0;
   private inviteSecrets = new Map<string, { token: string; code: string }>();
 
   private async request<T>(path: string, init: RequestInit = {}, csrfRequired = true): Promise<T> {
@@ -126,6 +144,8 @@ export class HttpRepository implements JourneyRepository {
       false,
     );
     this.csrf = result.csrf_token;
+    this.current = undefined;
+    this.cacheExpires = 0;
   }
   async register(input: {
     email: string;
@@ -170,11 +190,13 @@ export class HttpRepository implements JourneyRepository {
     this.inviteSecrets.clear();
   }
   async uploadAvatar(file: Blob) {
+    this.cacheExpires = 0;
     const form = new FormData();
     form.append('file', file, 'avatar');
     return this.request('/users/me/avatar', { method: 'POST', body: form });
   }
   async deleteAvatar() {
+    this.cacheExpires = 0;
     return this.request('/users/me/avatar', { method: 'DELETE' });
   }
 
@@ -193,6 +215,7 @@ export class HttpRepository implements JourneyRepository {
   }
 
   async read(actor: Id): Promise<Store> {
+    if (this.current?.identity === actor && Date.now() < this.cacheExpires) return this.current;
     const { user: apiUser } = await this.request<{ user: ApiUser }>('/auth/session');
     const state = empty(actor);
     const user: User = {
@@ -203,7 +226,9 @@ export class HttpRepository implements JourneyRepository {
     };
     state.users.push(user);
     if (user.avatarPhotoId) {
-      const avatar = await this.request<{ url: string }>(`/photos/${user.avatarPhotoId}/read-url`);
+      const avatar = await this.request<{ url: string }>(`/photos/${user.avatarPhotoId}/read-url`, {
+        method: 'POST',
+      });
       state.photos.push({
         id: user.avatarPhotoId,
         blob: new Blob(),
@@ -254,8 +279,10 @@ export class HttpRepository implements JourneyRepository {
         const photoIds: string[] = [];
         for (const photo of photos.items) {
           const [full, thumb] = await Promise.all([
-            this.request<{ url: string }>(`/photos/${photo.id}/read-url`),
-            this.request<{ url: string }>(`/photos/${photo.id}/read-url?thumbnail=true`),
+            this.request<{ url: string }>(`/photos/${photo.id}/read-url`, { method: 'POST' }),
+            this.request<{ url: string }>(`/photos/${photo.id}/read-url?thumbnail=true`, {
+              method: 'POST',
+            }),
           ]);
           photoIds.push(photo.id);
           state.photos.push({
@@ -264,6 +291,8 @@ export class HttpRepository implements JourneyRepository {
             checksum: photo.checksum,
             src: full.url,
             thumbnailSrc: thumb.url,
+            width: photo.width,
+            height: photo.height,
           });
         }
         state.memories.push({
@@ -294,6 +323,7 @@ export class HttpRepository implements JourneyRepository {
             text: c.body,
             edited: c.edited,
             version: c.version,
+            createdAt: c.created_at ?? undefined,
           })),
         );
         state.reactions.push(
@@ -312,11 +342,14 @@ export class HttpRepository implements JourneyRepository {
       if (!state.users.some((u) => u.id === id)) state.users.push({ id, name, email: '' });
     }
     this.current = state;
+    // Signed photo URLs last 120 seconds; expire the in-memory snapshot well before they do.
+    this.cacheExpires = Date.now() + 30_000;
     return state;
   }
 
   async dispatch(actor: Id, command: Command): Promise<Id | undefined> {
     const cached = this.current;
+    this.cacheExpires = 0;
     const json = (value: unknown) => JSON.stringify(value);
     switch (command.type) {
       case 'createAlbum': {
