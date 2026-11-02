@@ -1,0 +1,59 @@
+# Full local stack: docker compose up --build  ->  http://localhost:8080
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: journey
+      POSTGRES_PASSWORD: journey
+      POSTGRES_DB: journey
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - journey_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U journey -d journey"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [journey]
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      OJ_DATABASE_URL: postgresql+psycopg://journey:journey@db:5432/journey
+      OJ_ENVIRONMENT: development
+      OJ_STORAGE_DRIVER: local
+      OJ_LOCAL_STORAGE_PATH: /data/uploads
+      OJ_ALLOWED_ORIGINS: '["http://localhost:8080"]'
+      OJ_PUBLIC_WEB_URL: http://localhost:8080
+    command: sh -c "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    volumes:
+      - journey_uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks: [journey]
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [journey]
+
+networks:
+  journey:
+
+volumes:
+  journey_db:
+  journey_uploads:
