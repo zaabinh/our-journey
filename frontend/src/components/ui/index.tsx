@@ -119,10 +119,10 @@ export function Skeleton({ label = 'Đang tải…' }: { label?: string }) {
     </div>
   );
 }
-export function Avatar({ name }: { name: string }) {
+export function Avatar({ name, src }: { name: string; src?: string }) {
   return (
     <span className="avatar" aria-label={name}>
-      {name.slice(0, 1).toUpperCase()}
+      {src ? <img src={src} alt="" /> : name.slice(0, 1).toUpperCase()}
     </span>
   );
 }

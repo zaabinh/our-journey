@@ -25,7 +25,7 @@ export function MemoryForm({
   const { state, dispatch } = useJourney(),
     action = useAction();
   const [title, setTitle] = useState(memory?.title ?? ''),
-    [date, setDate] = useState(memory?.date ?? today()),
+    [date, setDate] = useState(memory ? memory.date : today()),
     [location, setLocation] = useState(memory?.location ?? ''),
     [note, setNote] = useState(memory?.note ?? ''),
     [heart, setHeart] = useState(!!memory?.animations.heart),
@@ -48,7 +48,7 @@ export function MemoryForm({
   useEffect(() => {
     if (open) {
       setTitle(memory?.title ?? '');
-      setDate(memory?.date ?? today());
+      setDate(memory ? memory.date : today());
       setLocation(memory?.location ?? '');
       setNote(memory?.note ?? '');
       setHeart(!!memory?.animations.heart);
@@ -78,7 +78,7 @@ export function MemoryForm({
   }
   const dirty =
     title !== (memory?.title ?? '') ||
-    date !== (memory?.date ?? today()) ||
+    date !== (memory ? memory.date : today()) ||
     location !== (memory?.location ?? '') ||
     note !== (memory?.note ?? '') ||
     heart !== !!memory?.animations.heart ||
@@ -92,6 +92,11 @@ export function MemoryForm({
     const next = [...blobs];
     [next[index], next[index + step]] = [next[index + step], next[index]];
     setBlobs(next);
+  }
+  function moveSaved(index: number, step: number) {
+    const next = [...preservedPhotoIds];
+    [next[index], next[index + step]] = [next[index + step], next[index]];
+    setPreservedPhotoIds(next);
   }
   return (
     <Dialog
@@ -130,7 +135,7 @@ export function MemoryForm({
       >
         <div className="field">
           <label htmlFor="memory-upload">
-            Ảnh JPEG/PNG/WebP (1–50 ảnh, 20 MB/ảnh, 100 MB tổng)
+            Ảnh JPEG/PNG/WebP (tối đa 10 ảnh, 15 MB/ảnh)
           </label>
           <input
             id="memory-upload"
@@ -143,10 +148,10 @@ export function MemoryForm({
                 files = [...(input.files ?? [])];
               void action.run(async () => {
                 if (
-                  blobs.length + files.length > 50 ||
-                  [...blobs, ...files].reduce((n, b) => n + b.size, 0) > 100 * 1024 * 1024
+                  blobs.length + preservedPhotoIds.length + files.length > 10 ||
+                  files.some((file) => file.size > 15 * 1024 * 1024)
                 )
-                  throw Error('Vượt giới hạn 50 ảnh hoặc 100 MB.');
+                  throw Error('Tối đa 10 ảnh và 15 MB mỗi ảnh.');
                 const prepared = await Promise.all(files.map(preparePhoto));
                 prepared.forEach((p, i) =>
                   previewCache.current.set(files[i], p.thumbnail ?? p.blob),
@@ -165,6 +170,8 @@ export function MemoryForm({
               <div className="upload-preview" key={id}>
                 <BlobImage photo={photo} alt={`Ảnh hiện có ${i + 1}`} />
                 <div className="actions">
+                  <Button variant="secondary" aria-label={`Ảnh hiện có ${i + 1} lên trước`} disabled={i === 0 || action.pending} onClick={() => moveSaved(i, -1)}>↑</Button>
+                  <Button variant="secondary" aria-label={`Ảnh hiện có ${i + 1} xuống sau`} disabled={i === preservedPhotoIds.length - 1 || action.pending} onClick={() => moveSaved(i, 1)}>↓</Button>
                   <Button
                     variant="secondary"
                     aria-label={`Xóa ảnh hiện có ${i + 1}`}

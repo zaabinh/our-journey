@@ -6,7 +6,7 @@ import { Button } from '../components/ui';
 
 export function AppShell() {
   const { pathname } = useLocation(), { state, initialized, logout } = useJourney();
-  const isPublic = pathname === '/' || pathname === '/login' || pathname === '/signup';
+  const isPublic = ['/', '/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'].includes(pathname);
   const homeRoute = pathname === '/';
   useEffect(() => { document.getElementById('main')?.focus(); }, [pathname]);
   if (initialized && !state && !isPublic) return <Navigate replace to="/login" state={{ from: pathname }} />;

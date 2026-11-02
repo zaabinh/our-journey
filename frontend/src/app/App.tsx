@@ -7,7 +7,7 @@ import { SettingsPage } from '../features/albums/SettingsPage';
 import { MemoryPage } from '../features/memories/MemoryPage';
 import { ProfilePage } from '../features/profile/ProfilePage';
 import { JoinPage } from '../features/members/JoinPage';
-import { LoginPage, SignupPage } from '../features/auth/AccountPages';
+import { AccountLinkPage, LoginPage, SignupPage } from '../features/auth/AccountPages';
 export function App() {
   return (
     <Routes>
@@ -21,6 +21,9 @@ export function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/verify-email" element={<AccountLinkPage mode="verify" />} />
+        <Route path="/forgot-password" element={<AccountLinkPage mode="forgot" />} />
+        <Route path="/reset-password" element={<AccountLinkPage mode="reset" />} />
         {[
           ['home.html', '/'],
           ['index.html', '/'],

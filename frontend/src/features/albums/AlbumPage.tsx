@@ -13,6 +13,8 @@ export function AlbumPage() {
     { state, actor, dispatch } = useJourney(),
     action = useAction();
   const [query, setQuery] = useState(''),
+    [dateFrom, setDateFrom] = useState(''),
+    [dateTo, setDateTo] = useState(''),
     [sort, setSort] = useState('order'),
     [limit, setLimit] = useState(12),
     [open, setOpen] = useState(false),
@@ -34,6 +36,7 @@ export function AlbumPage() {
           v.toLocaleLowerCase().includes(q),
         ),
       )
+      .filter((m) => (!dateFrom || (!!m.date && m.date >= dateFrom)) && (!dateTo || (!!m.date && m.date <= dateTo)))
       .sort((a, b) =>
         sort === 'date'
           ? (b.date || b.dateLabel || '').localeCompare(a.date || a.dateLabel || '')
@@ -217,6 +220,8 @@ export function AlbumPage() {
                       setLimit(12);
                     }}
                   />
+                  <Input label="Từ ngày" type="date" value={dateFrom} max={dateTo || undefined} onChange={(event) => { setDateFrom(event.target.value); setLimit(12); }} />
+                  <Input label="Đến ngày" type="date" value={dateTo} min={dateFrom || undefined} onChange={(event) => { setDateTo(event.target.value); setLimit(12); }} />
                   <Dropdown
                     label="Sắp xếp"
                     value={sort}

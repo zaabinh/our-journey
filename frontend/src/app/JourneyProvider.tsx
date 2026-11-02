@@ -106,7 +106,6 @@ export function JourneyProvider({
           const auth = repo as JourneyRepository & { register?: (input: { email: string; username: string; display_name: string; password: string }) => Promise<void> };
           if (!auth.register) throw Error('Đăng ký không khả dụng.');
           await auth.register(input);
-          await refresh();
         },
         logout: async () => {
           const auth = repo as JourneyRepository & { logout?: () => Promise<void> };

@@ -1,9 +1,9 @@
 import type { Command, Id, JourneyRepository, Role, Store, User } from '../../domain/types';
 
-type ApiUser = { id: string; email: string; username?: string; display_name: string };
+type ApiUser = { id: string; email: string; username?: string; display_name: string; avatar_photo_id?: string };
 const empty = (identity = ''): Store => ({ version: 1, identity, users: [], albums: [], members: [], invites: [], memories: [], photos: [], comments: [], reactions: [], imports: [] });
-type AlbumDto = { id: string; owner_id: string; title: string; description: string; version: number; role: Role };
-type MemoryDto = { id: string; album_id: string; author_id: string; title: string; date: string; location: string; note: string; position: number; version: number; published: boolean; animations: Record<string, unknown> };
+type AlbumDto = { id: string; owner_id: string; title: string; description: string; version: number; role: Role; cover_photo_id?: string };
+type MemoryDto = { id: string; album_id: string; author_id: string; title: string; date: string | null; date_label?: string | null; location: string; note: string; position: number; version: number; published: boolean; animations: Record<string, unknown> };
 type PhotoDto = { id: string; checksum: string };
 type MemberDto = { user_id: string; display_name: string; role: 'owner' | 'contributor' | 'viewer' };
 
@@ -32,9 +32,14 @@ export class HttpRepository implements JourneyRepository {
   }
   async register(input: { email: string; username: string; display_name: string; password: string }) {
     await this.request('/auth/register', { method: 'POST', body: JSON.stringify(input) }, false);
-    await this.login(input.email, input.password);
   }
+  async verifyEmail(token: string) { return this.request('/auth/verify-email', { method: 'POST', body: JSON.stringify({ token }) }, false); }
+  async resendVerification(email: string) { return this.request('/auth/resend-verification', { method: 'POST', body: JSON.stringify({ email }) }, false); }
+  async requestPasswordReset(email: string) { return this.request('/auth/password-reset/request', { method: 'POST', body: JSON.stringify({ email }) }, false); }
+  async resetPassword(token: string, password: string) { return this.request('/auth/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token, password }) }, false); }
   async logout() { await this.request('/auth/logout', { method: 'POST' }); this.csrf = ''; this.current = undefined; }
+  async uploadAvatar(file: Blob) { const form = new FormData(); form.append('file', file, 'avatar'); return this.request('/users/me/avatar', { method: 'POST', body: form }); }
+  async deleteAvatar() { return this.request('/users/me/avatar', { method: 'DELETE' }); }
   async identity() {
     const { user } = await this.request<{ user: ApiUser }>('/auth/session');
     const mapped: User = { id: user.id, name: user.display_name, email: user.email };
@@ -45,9 +50,13 @@ export class HttpRepository implements JourneyRepository {
   async read(actor: Id): Promise<Store> {
     const { user: apiUser } = await this.request<{ user: ApiUser }>('/auth/session');
     const albumsResponse = await this.request<{ items: AlbumDto[] }>('/albums?limit=100');
-    const state = empty(actor), user: User = { id: apiUser.id, name: apiUser.display_name, email: apiUser.email };
+    const state = empty(actor), user: User = { id: apiUser.id, name: apiUser.display_name, email: apiUser.email, avatarPhotoId: apiUser.avatar_photo_id };
     state.users.push(user);
-    state.albums = albumsResponse.items.map(a => ({ id: a.id, ownerId: a.owner_id, title: a.title, description: a.description, version: a.version, role: a.role }));
+    if (user.avatarPhotoId) {
+      const avatar = await this.request<{ url: string }>(`/photos/${user.avatarPhotoId}/read-url`);
+      state.photos.push({ id: user.avatarPhotoId, blob: new Blob(), checksum: '', src: avatar.url });
+    }
+    state.albums = albumsResponse.items.map(a => ({ id: a.id, ownerId: a.owner_id, title: a.title, description: a.description, coverPhotoId: a.cover_photo_id, version: a.version, role: a.role }));
     for (const album of state.albums) {
       if (album.role === 'owner') state.members.push({ albumId: album.id, userId: actor, role: 'owner' });
       const memories = await this.request<{ items: MemoryDto[] }>(`/albums/${album.id}/memories?limit=100`);
@@ -62,7 +71,7 @@ export class HttpRepository implements JourneyRepository {
           photoIds.push(p.id);
           state.photos.push({ id: p.id, blob: new Blob(), checksum: p.checksum, src: full.url, thumbnailSrc: thumb.url });
         }
-        state.memories.push({ id: item.id, albumId: album.id, authorId: item.author_id, title: item.title, date: item.date ?? '', location: item.location, note: item.note, photoIds, order: item.position, version: item.version, published: item.published, animations: item.animations ?? {} });
+        state.memories.push({ id: item.id, albumId: album.id, authorId: item.author_id, title: item.title, date: item.date ?? '', dateLabel: item.date_label ?? undefined, location: item.location, note: item.note, photoIds, order: item.position, version: item.version, published: item.published, animations: item.animations ?? {} });
       }
       const members = await this.request<{ items: MemberDto[] }>(`/albums/${album.id}/members`);
       state.members = state.members.filter(m => m.albumId !== album.id);
@@ -76,14 +85,22 @@ export class HttpRepository implements JourneyRepository {
     const json = (value: unknown) => JSON.stringify(value);
     switch (command.type) {
       case 'createAlbum': { const a = await this.request<AlbumDto>('/albums', { method: 'POST', body: json({ title: command.title, description: command.description }) }); return a.id; }
-      case 'updateAlbum': { const a = cached?.albums.find(x => x.id === command.albumId); await this.request(`/albums/${command.albumId}`, { method: 'PATCH', body: json({ title: command.title, description: command.description, expected_version: a?.version ?? 1 }) }); break; }
+      case 'updateAlbum': { const a = cached?.albums.find(x => x.id === command.albumId); await this.request(`/albums/${command.albumId}`, { method: 'PATCH', body: json({ title: command.title, description: command.description, cover_photo_id: command.coverPhotoId ?? null, expected_version: a?.version ?? 1 }) }); break; }
       case 'deleteAlbum': await this.request(`/albums/${command.albumId}`, { method: 'DELETE' }); break;
       case 'saveMemory': {
         const previous = command.memoryId ? cached?.memories.find(x => x.id === command.memoryId) : undefined;
-        const body = { title: command.draft.title, date: command.draft.date, location: command.draft.location, note: command.draft.note, animations: command.draft.animations, ...(previous ? { expected_version: previous.version ?? 1 } : {}) };
+        const body = { title: command.draft.title, date: command.draft.date || null, date_label: command.draft.date ? null : command.draft.dateLabel ?? null, location: command.draft.location, note: command.draft.note, animations: command.draft.animations, ...(previous ? { expected_version: previous.version ?? 1 } : {}) };
         const item = previous ? await this.request<MemoryDto>(`/memories/${previous.id}`, { method: 'PATCH', body: json(body) }) : await this.request<MemoryDto>(`/albums/${command.albumId}/memories`, { method: 'POST', body: json(body) });
+        const uploaded: string[] = [];
+        for (const blob of command.blobs) { const form = new FormData(); form.append('file', blob, 'memory.jpg'); const photo = await this.request<{ id: string }>(`/memories/${item.id}/photos`, { method: 'POST', body: form }); uploaded.push(photo.id); }
+        let memoryVersion = item.version;
+        if (!item.published && [...(command.preservePhotoIds ?? []), ...uploaded].length) {
+          const published = await this.request<MemoryDto>(`/memories/${item.id}/publish`, { method: 'POST' });
+          memoryVersion = published.version;
+        }
         for (const id of previous?.photoIds ?? []) if (!command.preservePhotoIds?.includes(id)) await this.request(`/photos/${id}`, { method: 'DELETE' });
-        for (const blob of command.blobs) { const form = new FormData(); form.append('file', blob, 'memory.jpg'); await this.request(`/memories/${item.id}/photos`, { method: 'POST', body: form }); }
+        const ordered = [...(command.preservePhotoIds ?? []), ...uploaded];
+        if (ordered.length) await this.request(`/memories/${item.id}/photo-order`, { method: 'PUT', body: json({ ids: ordered, expected_version: memoryVersion }) });
         return item.id;
       }
       case 'deleteMemory': await this.request(`/memories/${command.memoryId}`, { method: 'DELETE' }); break;

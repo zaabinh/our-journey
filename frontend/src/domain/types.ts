@@ -6,6 +6,7 @@ export interface User {
   id: Id;
   name: string;
   email: string;
+  avatarPhotoId?: Id;
 }
 export interface Album {
   id: Id;

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
 import { useUnsavedChanges } from '../../app/useUnsavedChanges';
 import { Alert, Button, Card, Input } from '../../components/ui';
@@ -37,7 +37,7 @@ function PasswordPolicy({ password }: { password: string }) {
 
 export function LoginPage() {
   const { state, login } = useJourney(), action = useAction(), navigate = useNavigate();
-  const [identifier, setIdentifier] = useState(''), [password, setPassword] = useState('');
+  const [identifier, setIdentifier] = useState(''), [password, setPassword] = useState(''), [params] = useSearchParams();
   if (state) return <Navigate replace to="/albums" />;
   return (
     <section className="auth-page" aria-labelledby="auth-title">
@@ -49,6 +49,10 @@ export function LoginPage() {
           {action.error && <div role="alert"><Alert>{action.error}</Alert></div>}
           <Button type="submit" disabled={action.pending}>{action.pending ? 'Đang đăng nhập…' : 'Đăng nhập'}</Button>
         </form>
+        {params.get('registered') === '1' && <Alert>Đã tạo tài khoản. Hãy mở email để xác minh trước khi đăng nhập.</Alert>}
+        <p className="auth-switch"><Link to="/forgot-password">Quên mật khẩu?</Link></p>
+        <p className="auth-switch"><Link to="/login?verify=1">Gửi lại email xác minh</Link></p>
+        {params.get('verify') === '1' && <ResendVerification />}
         <p className="auth-switch">Chưa có tài khoản? <Link to="/signup">Đăng ký</Link></p>
       </Card>
     </section>
@@ -64,7 +68,7 @@ export function SignupPage() {
     <section className="auth-page auth-page-signup" aria-labelledby="auth-title">
       <Card className="auth-card">
         <header className="auth-heading"><img src="/brand/love.png" alt=""/><div><span>BẮT ĐẦU HÀNH TRÌNH</span><h1 id="auth-title">Tạo tài khoản</h1><p>Our journey start here! Hãy để chúng tôi giúp bạn lưu giữ kỷ niệm.</p></div></header>
-        <form className="auth-form auth-form-signup" onSubmit={(event) => { event.preventDefault(); void action.run(async () => { await register({ display_name: name.trim(), username: username.trim(), email: email.trim(), password }); navigate('/albums'); }); }}>
+        <form className="auth-form auth-form-signup" onSubmit={(event) => { event.preventDefault(); void action.run(async () => { await register({ display_name: name.trim(), username: username.trim(), email: email.trim(), password }); navigate('/login?registered=1'); }); }}>
           <div className="auth-field-grid">
             <Input label="Tên hiển thị" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} required maxLength={100}/>
             <Input label="Tên đăng nhập" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required minLength={3} maxLength={64} pattern="[-a-zA-Z0-9_.]+"/>
@@ -79,4 +83,51 @@ export function SignupPage() {
       </Card>
     </section>
   );
+}
+
+function ResendVerification() {
+  const { repo } = useJourney(), action = useAction();
+  const [email, setEmail] = useState(''), [sent, setSent] = useState(false);
+  const accounts = repo as typeof repo & { resendVerification?: (email: string) => Promise<unknown> };
+  return <form className="auth-form" onSubmit={(event) => { event.preventDefault(); void action.run(async () => { if (!accounts.resendVerification) throw Error('Không khả dụng.'); await accounts.resendVerification(email); setSent(true); }); }}>
+    <Input label="Gửi lại email xác minh" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+    <Button variant="secondary" type="submit" disabled={action.pending}>Gửi lại liên kết</Button>
+    {sent && <p role="status">Nếu tài khoản cần xác minh, email sẽ được gửi.</p>}
+    {action.error && <Alert>{action.error}</Alert>}
+  </form>;
+}
+
+export function AccountLinkPage({ mode }: { mode: 'verify' | 'forgot' | 'reset' }) {
+  const { repo } = useJourney(), action = useAction(), [params] = useSearchParams();
+  const [email, setEmail] = useState(''), [password, setPassword] = useState(''), [done, setDone] = useState(false);
+  const accounts = repo as typeof repo & {
+    verifyEmail?: (token: string) => Promise<unknown>;
+    requestPasswordReset?: (email: string) => Promise<unknown>;
+    resetPassword?: (token: string, password: string) => Promise<unknown>;
+  };
+  const title = mode === 'verify' ? 'Xác minh email' : mode === 'forgot' ? 'Khôi phục mật khẩu' : 'Đặt mật khẩu mới';
+  const submit = async () => {
+    if (mode === 'verify') {
+      if (!accounts.verifyEmail || !params.get('token')) throw Error('Liên kết xác minh không hợp lệ.');
+      await accounts.verifyEmail(params.get('token')!);
+    } else if (mode === 'forgot') {
+      if (!accounts.requestPasswordReset) throw Error('Không khả dụng.');
+      await accounts.requestPasswordReset(email.trim());
+    } else {
+      if (!accounts.resetPassword || !params.get('token')) throw Error('Liên kết đặt lại không hợp lệ.');
+      await accounts.resetPassword(params.get('token')!, password);
+    }
+    setDone(true);
+  };
+  return <section className="auth-page"><Card className="auth-card">
+    <header className="auth-heading"><img src="/brand/love.png" alt=""/><div><span>OUR JOURNEY</span><h1>{title}</h1><p>{mode === 'forgot' ? 'Nhập email tài khoản để nhận liên kết bảo mật.' : 'Liên kết chỉ sử dụng một lần và sẽ hết hạn.'}</p></div></header>
+    {!done && <form className="auth-form" onSubmit={(event) => { event.preventDefault(); void action.run(submit); }}>
+      {mode === 'forgot' && <Input label="Email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />}
+      {mode === 'reset' && <><Input label="Mật khẩu mới" type="password" autoComplete="new-password" minLength={10} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} required /><PasswordPolicy password={password}/></>}
+      {action.error && <Alert>{action.error}</Alert>}
+      <Button type="submit" disabled={action.pending}>{action.pending ? 'Đang xử lý…' : title}</Button>
+    </form>}
+    {done && <p role="status">{mode === 'forgot' ? 'Nếu email khớp với tài khoản, liên kết khôi phục sẽ được gửi.' : mode === 'verify' ? 'Email đã được xác minh.' : 'Mật khẩu đã được cập nhật. Hãy đăng nhập lại.'}</p>}
+    <p className="auth-switch"><Link to="/login">Quay lại đăng nhập</Link></p>
+  </Card></section>;
 }
