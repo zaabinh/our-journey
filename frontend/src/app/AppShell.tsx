@@ -5,6 +5,7 @@ import { UnsavedChangesGuard } from './useUnsavedChanges';
 import { Button, Skeleton } from '../components/ui';
 import { IdentitySelector } from '../features/auth/IdentitySelector';
 import { Footer } from './Footer';
+import { CardGridSkeleton, MemoryDetailSkeleton } from '../components/ui/skeletons';
 
 export function AppShell() {
   const { pathname } = useLocation(),
@@ -35,7 +36,15 @@ export function AppShell() {
   if (!initialized && !isPublic)
     return (
       <main id="main" className="auth-loading">
-        <Skeleton label="Đang tải dữ liệu của bạn…" />
+        {/^\/albums\/[^/]+\/memories\/[^/]+\/?$/.test(pathname) ? (
+          <MemoryDetailSkeleton />
+        ) : /^\/albums\/[^/]+\/?$/.test(pathname) ? (
+          <CardGridSkeleton variant="memory" />
+        ) : /^\/albums\/?$/.test(pathname) ? (
+          <CardGridSkeleton variant="album" />
+        ) : (
+          <Skeleton label="Đang tải dữ liệu của bạn…" />
+        )}
       </main>
     );
   return (
