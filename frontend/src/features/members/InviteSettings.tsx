@@ -11,11 +11,12 @@ export function InviteSettings({ albumId }: { albumId: string }) {
   const { state, dispatch } = useJourney(),
     action = useAction(),
     [role, setRole] = useState<MemberRole>('viewer'),
+    [recipientEmail, setRecipientEmail] = useState(''),
     [initialExpiry] = useState(() => localTime(Date.now() + 7 * 86400000)),
     [expiry, setExpiry] = useState(initialExpiry),
     [saved, setSaved] = useState(false),
     [notice, setNotice] = useState('');
-  useUnsavedChanges(!saved && (role !== 'viewer' || expiry !== initialExpiry));
+  useUnsavedChanges(!saved && (role !== 'viewer' || expiry !== initialExpiry || !!recipientEmail));
   const invites = state!.invites.filter((i) => i.albumId === albumId);
   return (
     <section>
@@ -30,11 +31,13 @@ export function InviteSettings({ albumId }: { albumId: string }) {
               albumId,
               role,
               expiresAt: new Date(expiry).getTime(),
+              recipientEmail: recipientEmail.trim() || undefined,
             });
             setNotice(
               'Đã tạo lời mời. Hãy sao chép liên kết hoặc mã để chia sẻ; bí mật chỉ hiển thị ngay sau khi tạo.',
             );
             setSaved(true);
+            setRecipientEmail('');
           });
         }}
       >
@@ -50,6 +53,14 @@ export function InviteSettings({ albumId }: { albumId: string }) {
             { value: 'viewer', label: 'Chỉ xem' },
             { value: 'contributor', label: 'Đóng góp' },
           ]}
+        />
+        <Input
+          label="Email người nhận (tùy chọn)"
+          type="email"
+          autoComplete="email"
+          value={recipientEmail}
+          onChange={(e) => setRecipientEmail(e.target.value)}
+          disabled={action.pending}
         />
         <Input
           label="Hết hạn (giờ thiết bị)"

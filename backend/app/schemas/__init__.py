@@ -77,6 +77,17 @@ class InviteCreate(Body):
     role: Role
     hours: int = Field(default=48, ge=1, le=168)
     max_uses: int = Field(default=10, ge=1, le=100)
+    recipient_email: str | None = Field(default=None, min_length=3, max_length=254)
+
+    @field_validator("recipient_email")
+    @classmethod
+    def recipient_email_valid(cls, value):
+        if value is None:
+            return value
+        normalized = value.strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", normalized):
+            raise ValueError("Invalid email")
+        return normalized
 
 
 class Redeem(Body):

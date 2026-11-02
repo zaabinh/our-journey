@@ -109,7 +109,13 @@ export type Command =
   | { type: 'deleteMemory'; memoryId: Id }
   | { type: 'publishMemory'; memoryId: Id }
   | { type: 'reorder'; albumId: Id; ids: Id[] }
-  | { type: 'createInvite'; albumId: Id; role: MemberRole; expiresAt: number }
+  | {
+      type: 'createInvite';
+      albumId: Id;
+      role: MemberRole;
+      expiresAt: number;
+      recipientEmail?: string;
+    }
   | { type: 'revokeInvite'; inviteId: Id }
   | { type: 'join'; token: string }
   | { type: 'setRole'; albumId: Id; userId: Id; role: MemberRole }

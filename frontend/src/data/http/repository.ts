@@ -414,7 +414,14 @@ export class HttpRepository implements JourneyRepository {
         );
         const invite = await this.request<{ id: string; token: string; code: string }>(
           '/albums/' + command.albumId + '/invites',
-          { method: 'POST', body: json({ role: command.role, hours }) },
+          {
+            method: 'POST',
+            body: json({
+              role: command.role,
+              hours,
+              recipient_email: command.recipientEmail || null,
+            }),
+          },
         );
         this.inviteSecrets.set(invite.id, { token: invite.token, code: invite.code });
         return invite.id;

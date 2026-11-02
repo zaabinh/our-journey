@@ -1,6 +1,8 @@
 # ruff: noqa: F403,F405
 from fastapi import APIRouter
 from .common import *
+from ..services.mail import send_notification
+from ..services.notifications import notify
 
 router = APIRouter()
 
@@ -87,7 +89,17 @@ def edit_member(album_id: str, user_id: str, body: s.MemberEdit, user: Auth, db:
     member = db.get(m.Member, (album_id, user_id))
     if not member:
         fail(404, "NOT_FOUND", "Member not found")
+    old_role = member.role
     member.role = body.role
+    if old_role != body.role:
+        notify(
+            db,
+            user_id,
+            subject="Quyền thành viên album đã thay đổi | Our Journey",
+            title="Quyền thành viên đã thay đổi",
+            paragraphs=[f"Quyền của bạn đã được cập nhật từ {old_role} thành {body.role}."],
+            path=f"/albums/{album_id}",
+        )
 
 
 @router.delete("/albums/{album_id}/members/{user_id}", status_code=204)
@@ -95,7 +107,17 @@ def remove_member(album_id: str, user_id: str, user: Auth, db: Db):
     album, _ = album_access(db, album_id, user, owner=True, lock=True)
     if album.owner_id == user_id:
         fail(409, "OWNER_PROTECTED", "Owner cannot leave")
+    target = db.get(m.User, user_id)
     db.execute(delete(m.Member).where(m.Member.album_id == album_id, m.Member.user_id == user_id))
+    if target:
+        notify(
+            db,
+            user_id,
+            subject="Bạn đã được gỡ khỏi album | Our Journey",
+            title="Thay đổi thành viên album",
+            paragraphs=[f"Bạn không còn là thành viên của album {album.title}."],
+            path="/albums",
+        )
 
 
 @router.post("/albums/{album_id}/leave", status_code=204)
@@ -104,11 +126,19 @@ def leave(album_id: str, user: Auth, db: Db):
     if album.owner_id == user.id:
         fail(409, "OWNER_PROTECTED", "Owner cannot leave")
     db.delete(db.get(m.Member, (album_id, user.id)))
+    notify(
+        db,
+        album.owner_id,
+        subject="Thành viên rời khỏi album | Our Journey",
+        title="Một thành viên đã rời album",
+        paragraphs=[f"{user.display_name} đã rời khỏi album {album.title}."],
+        path=f"/albums/{album_id}/settings",
+    )
 
 
 @router.post("/albums/{album_id}/invites", status_code=201)
 def invite(album_id: str, body: s.InviteCreate, user: Auth, db: Db):
-    album_access(db, album_id, user, owner=True)
+    album, _ = album_access(db, album_id, user, owner=True)
     token, code = secrets.token_urlsafe(32), secrets.token_hex(8).upper()
     inv = m.Invite(
         album_id=album_id,
@@ -120,6 +150,16 @@ def invite(album_id: str, body: s.InviteCreate, user: Auth, db: Db):
     )
     db.add(inv)
     db.flush()
+    if body.recipient_email:
+        url = f"{settings().public_web_url.rstrip('/')}/join/{token}"
+        send_notification(
+            body.recipient_email,
+            subject="Lời mời tham gia album | Our Journey",
+            title="Bạn được mời tham gia một album",
+            paragraphs=[f"{user.display_name} mời bạn tham gia album {album.title} trên Our Journey."],
+            action_label="Xem loi moi",
+            action_url=url,
+        )
     return {
         "id": inv.id,
         "token": token,
@@ -217,6 +257,14 @@ def redeem(body: s.Redeem, request: Request, user: Auth, db: Db):
     db.add(m.Member(album_id=album.id, user_id=user.id, role=inv.role))
     if not db.get(m.Redemption, (inv.id, user.id)):
         db.add(m.Redemption(invite_id=inv.id, user_id=user.id))
+    notify(
+        db,
+        album.owner_id,
+        subject="Thành viên mới tham gia album | Our Journey",
+        title="Có thành viên mới trong album",
+        paragraphs=[f"{user.display_name} đã tham gia album {album.title} với quyền {inv.role}."],
+        path=f"/albums/{album.id}/settings",
+    )
     return {"album_id": album.id, "already_member": False}
 
 

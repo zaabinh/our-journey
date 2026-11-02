@@ -1,7 +1,8 @@
 # ruff: noqa: F403,F405
 from datetime import date
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from ..services.media import persist_photo
+from ..services.notifications import notify, notify_album_members
 from .common import *
 
 router = APIRouter()
@@ -92,14 +93,25 @@ def edit_memory(memory_id: str, body: s.MemoryEdit, user: Auth, db: Db):
 
 @router.post("/memories/{memory_id}/publish")
 def publish(memory_id: str, user: Auth, db: Db):
-    memory, _, _ = memory_access(db, memory_id, user, edit=True, lock=True)
+    memory, album, _ = memory_access(db, memory_id, user, edit=True, lock=True)
     photo = db.scalar(
         select(m.Photo.id).where(m.Photo.memory_id == memory.id, m.Photo.status == "ready")
     )
     if not photo:
         fail(409, "NO_READY_PHOTO", "Upload at least one valid photo before publishing")
+    was_published = memory.published
     memory.published = True
     memory.version += 1
+    if not was_published:
+        notify_album_members(
+            db,
+            album.id,
+            {user.id},
+            subject="Kỷ niệm mới đã được đăng | Our Journey",
+            title="Một kỷ niệm mới vừa được chia sẻ",
+            paragraphs=[f"{user.display_name} đã đăng kỷ niệm: {memory.title}."],
+            path=f"/albums/{album.id}/memories/{memory.id}",
+        )
     return memory_json(memory)
 
 
@@ -165,13 +177,25 @@ def upload(memory_id: str, user: Auth, db: Db, file: UploadFile = File()):
         fail(422, "PHOTO_LIMIT", "At most ten photos per memory")
     raw = file.file.read(settings().max_upload_bytes + 1)
     # The object is hidden while pending; re-check album authorization after storage I/O.
-    photo = persist_photo(
-        db,
-        raw,
-        memory_id=memory.id,
-        position=count,
-        before_ready=lambda: memory_access(db, memory_id, user, edit=True, lock=True),
-    )
+    try:
+        photo = persist_photo(
+            db,
+            raw,
+            memory_id=memory.id,
+            position=count,
+            before_ready=lambda: memory_access(db, memory_id, user, edit=True, lock=True),
+        )
+    except HTTPException as exc:
+        if isinstance(exc.detail, dict) and exc.detail.get("code") == "UPLOAD_FAILED":
+            notify(
+                db,
+                user.id,
+                subject="Tải ảnh gặp lỗi | Our Journey",
+                title="Tải ảnh chưa thành công",
+                paragraphs=[f"Hệ thống không thể lưu ảnh cho kỷ niệm {memory.title}. Vui lòng thử lại sau."],
+                path=f"/albums/{memory.album_id}/memories/{memory.id}",
+            )
+        raise
     return {"id": photo.id, "width": photo.width, "height": photo.height, "status": "ready"}
 
 
