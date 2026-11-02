@@ -270,6 +270,7 @@ def test_comments_and_idempotent_reactions(actors):
     mem = writer.memory(album)["id"]
     publish(writer, mem)
     comment = writer.call("POST", f"/memories/{mem}/comments", json={"body": "hello"}).json()
+    assert comment["created_at"] is not None
     assert (
         owner.call(
             "PATCH",
@@ -301,6 +302,10 @@ def test_comments_and_idempotent_reactions(actors):
     assert response["items"] == [{"user_id": writer.user["id"], "kind": "heart"}]
     writer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "like"})
     assert writer.call("GET", f"/memories/{mem}/reactions").json()["counts"] == {"like": 1}
+    writer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "moved"})
+    assert writer.call("GET", f"/memories/{mem}/reactions").json()["counts"] == {"moved": 1}
+    writer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "care"})
+    assert writer.call("GET", f"/memories/{mem}/reactions").json()["counts"] == {"care": 1}
     assert viewer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "like"}).status_code == 403
 
 
@@ -380,3 +385,9 @@ def test_pagination_and_reorder_preserves_records(actors):
         },
     ).json()
     assert [x["id"] for x in first["items"] + second["items"]] == ids[::-1]
+
+
+def test_album_title_is_limited_to_50_characters(actors):
+    owner = actors["owner"]
+    assert owner.call("POST", "/albums", json={"title": "x" * 50}).status_code == 201
+    assert owner.call("POST", "/albums", json={"title": "x" * 51}).status_code == 422

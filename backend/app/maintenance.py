@@ -3,7 +3,7 @@
 from datetime import timedelta
 from sqlalchemy import select, delete
 from .db import SessionLocal
-from .models import StorageJob, Photo, Session, RateLimit, AccountToken, now
+from .models import StorageJob, Photo, Session, RateLimit, AccountToken, EmailOutbox, now
 from .storage import storage
 
 
@@ -16,6 +16,12 @@ def cleanup():
         db.execute(delete(Session).where(Session.expires_at < now()))
         db.execute(delete(RateLimit).where(RateLimit.expires_at < now()))
         db.execute(delete(AccountToken).where(AccountToken.expires_at < now()))
+        # Finished outbox rows hold comment excerpts; keep them only long enough to debug.
+        db.execute(
+            delete(EmailOutbox).where(
+                EmailOutbox.status != "pending", EmailOutbox.created_at < now() - timedelta(days=30)
+            )
+        )
         db.commit()
         # Pending intents are quarantined for an hour to avoid a live upload.
         jobs = db.scalars(
@@ -44,7 +50,9 @@ def cleanup():
             except Exception:
                 failed += 1
         db.commit()
-    return {"deleted": succeeded, "failed": failed}
+    from .services.notifications import deliver_outbox
+
+    return {"deleted": succeeded, "failed": failed, "emails": deliver_outbox()}
 
 
 if __name__ == "__main__":

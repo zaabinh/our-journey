@@ -36,7 +36,7 @@ GET lists are bounded (memories/comments/albums cursor pagination). Memory listi
 
 ## Storage and maintenance
 
-Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Email verification and password recovery need `OJ_PUBLIC_WEB_URL`, `OJ_RESEND_API_KEY`, `OJ_SMTP_USERNAME` (display name), `OJ_SMTP_FROM` (sender local-part or full address), and `OJ_SMTP_HOST` (sender domain when using a local-part). Register/recovery return a service error until Resend and sender identity are configured. Bucket must be private; public access must be checked in the account. No storage/email credential is sent to the browser. Real R2/Resend smoke tests need the owner's accounts.
+Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Email verification and password recovery need `OJ_PUBLIC_WEB_URL`, `OJ_RESEND_API_KEY`, `OJ_SMTP_USERNAME` (display name), `OJ_SMTP_FROM` (sender local-part or full address), and `OJ_SMTP_HOST` (sender domain when using a local-part). Set `OJ_PUBLIC_WEB_URL` to the deployed frontend's HTTPS domain in Render; startup now fails if it is unset or points to localhost, rather than generating localhost email links. Register/recovery return a service error until Resend and sender identity are configured. Bucket must be private; public access must be checked in the account. No storage/email credential is sent to the browser. Real R2/Resend smoke tests need the owner's accounts.
 
 Durable cleanup intent is inserted before writing files. A failed upload stays pending and hidden; cleanup removes orphan objects. Deletes immediately block reads but remove bytes asynchronously. Run at least hourly:
 
@@ -45,6 +45,36 @@ uv run python -m app.maintenance
 ```
 
 Jobs younger than one hour are quarantined; retries are idempotent. Expired auth/limiter records are purged. Failed uploads are hidden and excluded from the photo quota; their objects remain queued for cleanup. A process crash can leave pending metadata that still needs reconciliation. No backup claim is made: arrange database **and** object backup and test restore before production use.
+
+## Email
+
+Templates live in `app/services/email_templates.py` (one responsive layout plus a copy catalog keyed by kind); delivery uses the Resend HTTP API in `app/services/mail.py`. Every email greets the recipient as "Chào bạn, **display_name**" (escaped) or "Chào bạn," without a name, and ships an HTML and a plain-text part. The header image is `frontend/public/brand/email-header.png`, served at `OJ_EMAIL_HEADER_URL` (default `OJ_PUBLIC_WEB_URL/brand/email-header.png`; production requires HTTPS). Mail clients cannot load it from `localhost`, so local emails show the alt text instead.
+
+Delivery paths:
+
+- **Direct, synchronous:** verification and password-reset links. Raw tokens exist only in the email, never in the database.
+- **Direct, after commit:** album invites (the invite token is not stored) and upload-failure notices (the request rolls back, so there is nothing to commit).
+- **Outbox (`email_outbox`):** everything else. Rows are written in the request transaction, so they exist only if the change commits. One row per event and recipient (`dedupe_key`); self-notifications are excluded. An in-process worker sends them after commit, re-checks at send time that the recipient is verified, has not opted out (activity only) and can still see the album or memory, and retries with backoff (1 min, 5 min, 30 min, 2 h; `failed` after 5 attempts). Retries reuse the row id as Resend's `Idempotency-Key`. `python -m app.maintenance` also flushes due rows and deletes finished rows after 30 days.
+
+Security notices (`password_changed`, `profile_updated`, and the template-only `email_changed` and `suspicious_login`) ignore the opt-out. Activity emails respect `users.email_notifications`, set with `PATCH /users/me {"display_name": ..., "email_notifications": false}`; the frontend has no toggle yet.
+
+| Email | Trigger |
+|---|---|
+| Verify email, reset password | register, resend verification, reset request |
+| Album invite (role, expiry) | invite created with `recipient_email` |
+| Invite accepted | invite redeemed; notifies the owner |
+| Memory published | first publish; notifies owner and members except the author |
+| New comment | comment on someone else's memory; notifies the memory author |
+| Mention | `@username` of someone who can see the album |
+| Role change, removal, leave | owner changes role or removes a member; member leaves (notifies owner) |
+| Password changed | password reset confirmed |
+| Display name changed | `PATCH /users/me` with a new name |
+| Upload failure | storage backend fails while saving a photo or avatar |
+| Comment reply | **template only**: comments are flat, no reply/thread model |
+| Email changed | **template only**: no change-email endpoint |
+| Suspicious login | **template only**: no login-risk detection |
+
+Local smoke test without sending: run the stack, leave `OJ_RESEND_API_KEY` empty, trigger an action (for example publish a memory in a shared album), then inspect `SELECT kind, status, attempts, last_error FROM email_outbox`. Without credentials rows retry with `EMAIL_NOT_CONFIGURED` and end as `failed`. To send for real, set the Resend variables and use your own addresses.
 
 ## Tests
 

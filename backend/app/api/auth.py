@@ -2,9 +2,9 @@
 from fastapi import APIRouter, HTTPException
 from .common import *
 from sqlalchemy import select
-from ..services.mail import send_account_link
+from ..services.mail import send_account_link, send_best_effort
 from ..services.media import persist_photo, remove_old_avatar
-from ..services.notifications import notify
+from ..services.notifications import queue
 
 router = APIRouter()
 
@@ -42,7 +42,7 @@ def issue_account_token(db, user, purpose):
         )
     )
     db.flush()
-    send_account_link(user.email, purpose, raw)
+    send_account_link(user.email, purpose, raw, user.display_name)
 
 
 def consume_account_token(db, raw, purpose):
@@ -92,14 +92,7 @@ def confirm_password_reset(body: s.PasswordReset, request: Request, db: Db):
     user.password_hash = passwords.hash(body.password)
     db.execute(delete(m.Session).where(m.Session.user_id == user.id))
     db.execute(delete(m.AccountToken).where(m.AccountToken.user_id == user.id))
-    notify(
-        db,
-        user.id,
-        subject="Mật khẩu tài khoản đã được cập nhật | Our Journey",
-        title="Mật khẩu đã được cập nhật",
-        paragraphs=["Mật khẩu Our Journey của bạn vừa được đặt lại. Tất cả phiên đăng nhập cũ đã bị đăng xuất."],
-        path="/login",
-    )
+    queue(db, "password_changed", [user.id], {})
     return {"status": "password_updated"}
 
 
@@ -165,7 +158,13 @@ def profile(user: Auth):
 
 @router.patch("/users/me")
 def edit_profile(body: s.Profile, user: Auth, db: Db):
-    user.display_name = nonblank(body.display_name)
+    old_name, user.display_name = user.display_name, nonblank(body.display_name)
+    if body.email_notifications is not None:
+        user.email_notifications = body.email_notifications
+    if user.display_name != old_name:
+        queue(
+            db, "profile_updated", [user.id], {"old_name": old_name, "new_name": user.display_name}
+        )
     return public_user(user)
 
 
@@ -176,13 +175,12 @@ def upload_avatar(user: Auth, db: Db, file: UploadFile = File()):
         photo = persist_photo(db, raw, owner_id=user.id)
     except HTTPException as exc:
         if isinstance(exc.detail, dict) and exc.detail.get("code") == "UPLOAD_FAILED":
-            notify(
-                db,
-                user.id,
-                subject="Tải ảnh đại diện gặp lỗi | Our Journey",
-                title="Tải ảnh đại diện chưa thành công",
-                paragraphs=["Hệ thống không thể lưu ảnh đại diện. Vui lòng thử lại sau."],
-                path="/profile",
+            # Sent directly: the request rolls back, so an outbox row would be lost.
+            send_best_effort(
+                user.email,
+                "storage_failure",
+                {"target": "đại diện", "path": "/profile"},
+                name=user.display_name,
             )
         raise
     remove_old_avatar(db, user, photo)

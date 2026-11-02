@@ -87,6 +87,7 @@ def public_user(user):
         "username": user.username,
         "display_name": user.display_name,
         "avatar_photo_id": user.avatar_photo_id,
+        "email_notifications": user.email_notifications,
     }
 
 

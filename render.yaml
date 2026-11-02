@@ -36,6 +36,8 @@ services:
         sync: false
       - key: OJ_PUBLIC_WEB_URL
         sync: false
+      - key: OJ_RESEND_API_KEY
+        sync: false
       - key: OJ_SMTP_HOST
         sync: false
       - key: OJ_SMTP_PORT

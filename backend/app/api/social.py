@@ -2,7 +2,8 @@
 import re
 from fastapi import APIRouter
 from .common import *
-from ..services.notifications import notify
+from ..services.email_templates import excerpt
+from ..services.notifications import album_audience, queue
 
 router = APIRouter()
 
@@ -23,7 +24,10 @@ def comments(
 
 
 def comment_json(c):
-    return {k: getattr(c, k) for k in ("id", "memory_id", "author_id", "body", "version", "edited")}
+    return {
+        k: getattr(c, k)
+        for k in ("id", "memory_id", "author_id", "body", "version", "edited", "created_at")
+    }
 
 
 @router.post("/memories/{memory_id}/comments", status_code=201)
@@ -32,37 +36,44 @@ def comment(memory_id: str, body: s.CommentCreate, user: Auth, db: Db):
     item = m.Comment(memory_id=memory_id, author_id=user.id, body=nonblank(body.body))
     db.add(item)
     db.flush()
-    if memory.author_id != user.id:
-        notify(
-            db,
-            memory.author_id,
-            subject="Bình luận mới trong kỷ niệm | Our Journey",
-            title="Có bình luận mới",
-            paragraphs=[f"{user.display_name} đã bình luận về kỷ niệm {memory.title} trong album {album.title}.", item.body[:500]],
-            path=f"/albums/{album.id}/memories/{memory_id}",
-        )
-    # Support plain @username mentions without requiring a schema migration.
-    handles = {match.lower() for match in re.findall(r"(?<![\w])@([a-zA-Z0-9_.-]{3,64})", item.body)}
+    context = {
+        "album_id": album.id,
+        "album_title": album.title,
+        "memory_id": memory_id,
+        "memory_title": memory.title,
+        "commenter": user.display_name,
+        "excerpt": excerpt(item.body),
+    }
+    # Shared event key: the memory author gets one email even if also @mentioned.
+    event = f"comment:{item.id}"
+    queue(
+        db,
+        "comment_new",
+        [memory.author_id],
+        context,
+        event=event,
+        album_id=album.id,
+        exclude={user.id},
+    )
+    # Plain @username mentions, limited to people who can see the album.
+    handles = {
+        match.lower() for match in re.findall(r"(?<![\w])@([a-zA-Z0-9_.-]{3,64})", item.body)
+    }
     if handles:
-        authorized_ids = {album.owner_id}
-        authorized_ids.update(
-            db.scalars(select(m.Member.user_id).where(m.Member.album_id == album.id)).all()
-        )
         mentioned = db.scalars(
-            select(m.User).where(
-                func.lower(m.User.username).in_(handles), m.User.id.in_(authorized_ids)
+            select(m.User.id).where(
+                func.lower(m.User.username).in_(handles), m.User.id.in_(album_audience(db, album))
             )
         ).all()
-        for target in mentioned:
-            if target.id not in {user.id, memory.author_id}:
-                notify(
-                    db,
-                    target.id,
-                    subject="Bạn được nhắc trong bình luận | Our Journey",
-                    title="Bạn được nhắc trong một bình luận",
-                    paragraphs=[f"{user.display_name} đã nhắc đến bạn trong kỷ niệm {memory.title}.", item.body[:500]],
-                    path=f"/albums/{album.id}/memories/{memory_id}",
-                )
+        queue(
+            db,
+            "comment_mention",
+            mentioned,
+            context,
+            event=event,
+            album_id=album.id,
+            exclude={user.id},
+        )
     return comment_json(item)
 
 

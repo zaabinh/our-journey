@@ -33,7 +33,7 @@ def test_email_verification_resend_and_password_reset_are_single_use(monkeypatch
     links = []
     monkeypatch.setattr(
         "app.api.auth.send_account_link",
-        lambda email, purpose, token: links.append((email, purpose, token)),
+        lambda email, purpose, token, name=None: links.append((email, purpose, token)),
     )
     client = TestClient(app)
     payload = {

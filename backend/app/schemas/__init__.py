@@ -54,10 +54,12 @@ class PasswordReset(AccountTokenRequest):
 
 class Profile(Body):
     display_name: str = Field(min_length=1, max_length=100)
+    email_notifications: bool | None = None
 
 
 class AlbumCreate(Body):
-    title: str = Field(min_length=1, max_length=200)
+    # The title renders in a large script font; long titles wrap into clutter.
+    title: str = Field(min_length=1, max_length=50)
     description: str = Field(default="", max_length=10000)
 
 
@@ -126,4 +128,4 @@ class CommentEdit(CommentCreate):
 
 
 class ReactionSet(Body):
-    kind: Literal["heart", "like", "happy", "wow", "sad"]
+    kind: Literal["heart", "like", "happy", "wow", "sad", "moved", "care"]

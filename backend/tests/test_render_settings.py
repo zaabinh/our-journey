@@ -27,6 +27,32 @@ class RenderSettingsTests(unittest.TestCase):
                 _env_file=None, environment="production", storage_driver="local"
             ).validate_runtime()
 
+    def test_production_rejects_localhost_email_link_origin(self):
+        with self.assertRaisesRegex(ValueError, "OJ_PUBLIC_WEB_URL"):
+            Settings(
+                _env_file=None,
+                environment="production",
+                storage_driver="r2",
+                allowed_origins=["https://journey.example.test"],
+                r2_endpoint="https://r2.example.test",
+                r2_bucket="journey",
+                r2_access_key="test-key",
+                r2_secret_key="test-secret",
+            ).validate_runtime()
+
+    def test_production_accepts_https_frontend_origin(self):
+        Settings(
+            _env_file=None,
+            environment="production",
+            storage_driver="r2",
+            allowed_origins=["https://journey.example.test"],
+            r2_endpoint="https://r2.example.test",
+            r2_bucket="journey",
+            r2_access_key="test-key",
+            r2_secret_key="test-secret",
+            public_web_url="https://journey.example.test",
+        ).validate_runtime()
+
 
 if __name__ == "__main__":
     unittest.main()

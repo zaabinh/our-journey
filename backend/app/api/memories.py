@@ -2,7 +2,8 @@
 from datetime import date
 from fastapi import APIRouter, HTTPException
 from ..services.media import persist_photo
-from ..services.notifications import notify, notify_album_members
+from ..services.mail import send_best_effort
+from ..services.notifications import album_audience, queue
 from .common import *
 
 router = APIRouter()
@@ -103,14 +104,20 @@ def publish(memory_id: str, user: Auth, db: Db):
     memory.published = True
     memory.version += 1
     if not was_published:
-        notify_album_members(
+        queue(
             db,
-            album.id,
-            {user.id},
-            subject="Kỷ niệm mới đã được đăng | Our Journey",
-            title="Một kỷ niệm mới vừa được chia sẻ",
-            paragraphs=[f"{user.display_name} đã đăng kỷ niệm: {memory.title}."],
-            path=f"/albums/{album.id}/memories/{memory.id}",
+            "memory_published",
+            album_audience(db, album),
+            {
+                "album_id": album.id,
+                "album_title": album.title,
+                "memory_id": memory.id,
+                "memory_title": memory.title,
+                "author": user.display_name,
+            },
+            event=f"published:{memory.id}",
+            album_id=album.id,
+            exclude={user.id},
         )
     return memory_json(memory)
 
@@ -187,13 +194,15 @@ def upload(memory_id: str, user: Auth, db: Db, file: UploadFile = File()):
         )
     except HTTPException as exc:
         if isinstance(exc.detail, dict) and exc.detail.get("code") == "UPLOAD_FAILED":
-            notify(
-                db,
-                user.id,
-                subject="Tải ảnh gặp lỗi | Our Journey",
-                title="Tải ảnh chưa thành công",
-                paragraphs=[f"Hệ thống không thể lưu ảnh cho kỷ niệm {memory.title}. Vui lòng thử lại sau."],
-                path=f"/albums/{memory.album_id}/memories/{memory.id}",
+            # Sent directly: the request rolls back, so an outbox row would be lost.
+            send_best_effort(
+                user.email,
+                "storage_failure",
+                {
+                    "target": f"cho kỷ niệm “{memory.title}”",
+                    "path": f"/albums/{memory.album_id}/memories/{memory.id}",
+                },
+                name=user.display_name,
             )
         raise
     return {"id": photo.id, "width": photo.width, "height": photo.height, "status": "ready"}

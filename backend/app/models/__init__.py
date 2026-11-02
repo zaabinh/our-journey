@@ -1,7 +1,16 @@
 from datetime import UTC, date as Date, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import (
+    JSON,
+    true,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ..db import Base
@@ -24,6 +33,8 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text)
     email_verified: Mapped[bool] = mapped_column(default=True)
     avatar_photo_id: Mapped[str | None] = mapped_column(ForeignKey("photos.id"), nullable=True)
+    # Opt-out for activity emails only; security emails ignore it.
+    email_notifications: Mapped[bool] = mapped_column(default=True, server_default=true())
 
 
 class Session(Base):
@@ -124,6 +135,9 @@ class Comment(Base):
     body: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(default=1)
     edited: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=now, nullable=True
+    )
 
 
 class Reaction(Base):
@@ -131,7 +145,9 @@ class Reaction(Base):
     memory_id: Mapped[str] = mapped_column(ForeignKey("memories.id"), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     kind: Mapped[str] = mapped_column(String(16))
-    __table_args__ = (CheckConstraint("kind IN ('heart','like','happy','wow','sad')"),)
+    __table_args__ = (
+        CheckConstraint("kind IN ('heart','like','happy','wow','sad','moved','care')"),
+    )
 
 
 class StorageJob(Base):
@@ -162,3 +178,26 @@ class AccountToken(Base):
     purpose: Mapped[str] = mapped_column(String(24))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailOutbox(Base):
+    """Activity/notice emails written in the request transaction, delivered after commit."""
+
+    __tablename__ = "email_outbox"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=uid)
+    # One row per event and recipient; a repeated event cannot queue a second email.
+    dedupe_key: Mapped[str] = mapped_column(String(200), unique=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    category: Mapped[str] = mapped_column(String(16))
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    album_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    context: Mapped[dict] = mapped_column(JSON, default=dict)
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    attempts: Mapped[int] = mapped_column(default=0)
+    next_attempt_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    last_error: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    __table_args__ = (
+        CheckConstraint("category IN ('security','activity')"),
+        CheckConstraint("status IN ('pending','sent','failed','skipped')"),
+    )

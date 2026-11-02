@@ -1,20 +1,22 @@
-"""Resend delivery for account links and best-effort product notifications."""
+"""Resend HTTP delivery. Account links are sent directly; activity goes through the outbox."""
 
-import logging
 import json
+import logging
 from email.utils import formataddr
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
 from ..config import settings
 from ..errors import fail
-from .email_templates import render_notification_email, render_password_reset_email, render_verification_email
+from .email_templates import build, render_email
 
 logger = logging.getLogger(__name__)
 
 
-def _deliver(address: str, subject: str, text: str, html: str) -> None:
+def _deliver(
+    address: str, subject: str, text: str, html: str, idempotency_key: str | None = None
+) -> None:
     config = settings()
     if config.environment == "test":
         return
@@ -35,16 +37,15 @@ def _deliver(address: str, subject: str, text: str, html: str) -> None:
         },
         ensure_ascii=False,
     ).encode("utf-8")
-    request = Request(
-        "https://api.resend.com/emails",
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {config.resend_api_key}",
-            "Content-Type": "application/json",
-            "User-Agent": "OurJourney/1.0",
-        },
-        method="POST",
-    )
+    headers = {
+        "Authorization": f"Bearer {config.resend_api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": "OurJourney/1.0",
+    }
+    if idempotency_key:
+        # Resend drops a repeat with the same key, so an outbox retry cannot double-send.
+        headers["Idempotency-Key"] = idempotency_key
+    request = Request("https://api.resend.com/emails", data=payload, headers=headers, method="POST")
     try:
         with urlopen(request, timeout=30) as response:
             response.read()
@@ -53,42 +54,44 @@ def _deliver(address: str, subject: str, text: str, html: str) -> None:
         fail(503, "EMAIL_UNAVAILABLE", "Email delivery is temporarily unavailable")
 
 
-def send_account_link(address: str, purpose: str, token: str) -> None:
-    config = settings()
-    verify = purpose == "verify_email"
-    path = "verify-email" if verify else "reset-password"
-    url = f"{config.public_web_url.rstrip('/')}/{path}?{urlencode({'token': token})}"
-    title = "Xác minh email | Our Journey" if verify else "Đặt lại mật khẩu | Our Journey"
-    html = render_verification_email(url) if verify else render_password_reset_email(url)
-    text = (
-        f"Our Journey: {title}. Mở liên kết này để tiếp tục: {url}\n"
-        "Liên kết chỉ dùng một lần và hết hạn sau 1 giờ."
-    )
-    _deliver(address, title, text, html)
+def absolute_url(action: str | None) -> str | None:
+    if not action or action.startswith("https://") or action.startswith("http://"):
+        return action
+    return f"{settings().public_web_url.rstrip('/')}/{action.lstrip('/')}"
 
 
-def send_notification(
+def send_email(
     address: str,
+    kind: str,
+    context: dict,
     *,
-    subject: str,
-    title: str,
-    paragraphs: list[str],
-    action_label: str | None = None,
-    action_url: str | None = None,
-) -> bool:
-    """Send a non-critical event email without breaking the user operation."""
+    name: str | None,
+    idempotency_key: str | None = None,
+) -> None:
+    """Render and deliver one email; raises on delivery failure."""
+    email = build(kind, context)
+    html, text = render_email(
+        email,
+        name=name,
+        action_url=absolute_url(email.action),
+        header_url=settings().header_image_url(),
+    )
+    _deliver(address, email.subject, text, html, idempotency_key)
+
+
+def send_account_link(address: str, purpose: str, token: str, name: str | None = None) -> None:
+    # Raw tokens exist only in this email, never in the database or the outbox.
+    path = "verify-email" if purpose == "verify_email" else "reset-password"
+    url = f"{settings().public_web_url.rstrip('/')}/{path}?{urlencode({'token': token})}"
+    send_email(address, purpose, {"url": url}, name=name)
+
+
+def send_best_effort(address: str, kind: str, context: dict, *, name: str | None = None) -> bool:
+    """Notices that must not break the user operation (invites, upload failures)."""
     try:
-        html = render_notification_email(
-            preheader=subject,
-            title=title,
-            paragraphs=paragraphs,
-            action_label=action_label,
-            action_url=action_url,
-        )
-        text = "\n\n".join([title, *paragraphs, action_url or ""])
-        _deliver(address, subject, text, html)
+        send_email(address, kind, context, name=name)
         return True
     except Exception as exc:
-        # Never include recipient addresses, message bodies, or account links in logs.
-        logger.warning("Notification email failed (%s): %s", subject[:80], type(exc).__name__)
+        # Never include recipient addresses, message bodies, or links in logs.
+        logger.warning("Email %s failed: %s", kind, type(exc).__name__)
         return False
