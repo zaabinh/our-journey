@@ -20,11 +20,9 @@ class Settings(BaseSettings):
     max_image_pixels: int = 40_000_000
     public_web_url: str = "http://localhost:5173"
     smtp_host: str = ""
-    smtp_port: int = 587
     smtp_username: str = ""
-    smtp_password: str = ""
     smtp_from: str = ""
-    smtp_starttls: bool = True
+    resend_api_key: str = ""
 
     @field_validator("database_url", mode="before")
     @classmethod

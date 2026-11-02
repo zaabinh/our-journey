@@ -127,12 +127,14 @@ export function LoginPage() {
         {params.get('registered') === '1' && (
           <Alert>Đã tạo tài khoản. Hãy mở email để xác minh trước khi đăng nhập.</Alert>
         )}
-        <p className="auth-switch">
-          <Link to="/forgot-password">Quên mật khẩu?</Link>
-        </p>
-        <p className="auth-switch">
-          <Link to="/login?verify=1">Gửi lại email xác minh</Link>
-        </p>
+        <div className="auth-account-links">
+          <p className="auth-switch">
+            <Link to="/forgot-password">Quên mật khẩu?</Link>
+          </p>
+          <p className="auth-switch">
+            <Link to="/login?verify=1">Gửi lại email xác minh</Link>
+          </p>
+        </div>
         {params.get('verify') === '1' && <ResendVerification />}
         <p className="auth-switch">
           Chưa có tài khoản?{' '}

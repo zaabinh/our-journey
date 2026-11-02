@@ -49,7 +49,7 @@ def test_password_reset_template_escapes_link():
 
 def test_noncritical_notification_failure_does_not_raise(monkeypatch):
     def unavailable(*_args, **_kwargs):
-        raise RuntimeError("SMTP unavailable")
+        raise RuntimeError("Resend unavailable")
 
     monkeypatch.setattr(mail, "_deliver", unavailable)
 

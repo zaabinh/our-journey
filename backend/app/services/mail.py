@@ -1,9 +1,10 @@
-"""SMTP delivery for account links and best-effort product notifications."""
+"""Resend delivery for account links and best-effort product notifications."""
 
 import logging
-from email.message import EmailMessage
-import smtplib
-import ssl
+import json
+from email.utils import formataddr
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from urllib.parse import urlencode
 
 from ..config import settings
@@ -17,24 +18,38 @@ def _deliver(address: str, subject: str, text: str, html: str) -> None:
     config = settings()
     if config.environment == "test":
         return
-    if not all((config.smtp_host, config.smtp_from)):
+    if not all((config.resend_api_key, config.smtp_host, config.smtp_from)):
         fail(503, "EMAIL_NOT_CONFIGURED", "Email delivery is not configured")
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = config.smtp_from
-    message["To"] = address
-    message.set_content(text, charset="utf-8")
-    message.add_alternative(html, subtype="html", charset="utf-8")
+
+    sender_address = config.smtp_from.strip()
+    if "@" not in sender_address:
+        sender_address = f"{sender_address}@{config.smtp_host.strip()}"
+    sender = formataddr((config.smtp_username.strip(), sender_address))
+    payload = json.dumps(
+        {
+            "from": sender,
+            "to": [address],
+            "subject": subject,
+            "html": html,
+            "text": text,
+        },
+        ensure_ascii=False,
+    ).encode("utf-8")
+    request = Request(
+        "https://api.resend.com/emails",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {config.resend_api_key}",
+            "Content-Type": "application/json",
+            "User-Agent": "OurJourney/1.0",
+        },
+        method="POST",
+    )
     try:
-        with smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10) as client:
-            client.ehlo()
-            if config.smtp_starttls:
-                client.starttls(context=ssl.create_default_context())
-                client.ehlo()
-            if config.smtp_username:
-                client.login(config.smtp_username, config.smtp_password)
-            client.send_message(message)
-    except (OSError, smtplib.SMTPException):
+        with urlopen(request, timeout=30) as response:
+            response.read()
+    except (HTTPError, URLError, TimeoutError, OSError) as exc:
+        logger.warning("Resend email delivery failed: %s", type(exc).__name__)
         fail(503, "EMAIL_UNAVAILABLE", "Email delivery is temporarily unavailable")
 
 

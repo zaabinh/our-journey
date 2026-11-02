@@ -36,7 +36,7 @@ GET lists are bounded (memories/comments/albums cursor pagination). Memory listi
 
 ## Storage and maintenance
 
-Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Email verification and password recovery need `OJ_PUBLIC_WEB_URL`, `OJ_SMTP_HOST`, `OJ_SMTP_PORT`, `OJ_SMTP_USERNAME`, `OJ_SMTP_PASSWORD`, and `OJ_SMTP_FROM`; register/recovery return a service error until SMTP host/from are configured. Bucket must be private; public access must be checked in the account. No storage/email credential is sent to the browser. Real R2/SMTP smoke tests need the owner's accounts.
+Production refuses local storage; set `OJ_ENVIRONMENT=production`, `OJ_STORAGE_DRIVER=r2`, HTTPS origins and all R2 secrets from `.env.example`. Email verification and password recovery need `OJ_PUBLIC_WEB_URL`, `OJ_RESEND_API_KEY`, `OJ_SMTP_USERNAME` (display name), `OJ_SMTP_FROM` (sender local-part or full address), and `OJ_SMTP_HOST` (sender domain when using a local-part). Register/recovery return a service error until Resend and sender identity are configured. Bucket must be private; public access must be checked in the account. No storage/email credential is sent to the browser. Real R2/Resend smoke tests need the owner's accounts.
 
 Durable cleanup intent is inserted before writing files. A failed upload stays pending and hidden; cleanup removes orphan objects. Deletes immediately block reads but remove bytes asynchronously. Run at least hourly:
 
@@ -48,7 +48,7 @@ Jobs younger than one hour are quarantined; retries are idempotent. Expired auth
 
 ## Tests
 
-Set `OJ_TEST_DATABASE_URL` to a dedicated disposable PostgreSQL database. The test harness refuses to start without it, overrides `OJ_DATABASE_URL`, forces `OJ_ENVIRONMENT=test` (so no real SMTP is used), and truncates tables before each test. Never point it at local/production user data.
+Set `OJ_TEST_DATABASE_URL` to a dedicated disposable PostgreSQL database. The test harness refuses to start without it, overrides `OJ_DATABASE_URL`, forces `OJ_ENVIRONMENT=test` (so no real Resend requests are made), and truncates tables before each test. Never point it at local/production user data.
 
 ```sh
 export OJ_TEST_DATABASE_URL='postgresql+psycopg://journey_test:journey_test@localhost:5432/journey_test'
@@ -69,4 +69,4 @@ Tests exercise auth/CSRF, DB rate limits, role boundaries, invite race/expiry, c
 
 Dockerfile supports Render's `$PORT`. Run `alembic upgrade head` once in a pre-deploy step, not in every web worker. Set health check `/health/ready`. R2 is the durable media store, not Render's ephemeral filesystem. Verify cookie forwarding through the Vercel proxy on Safari/iOS and other target browsers before release. No services are created, billed or deployed by this branch.
 
-Open items: deployment/restore rehearsal; real SMTP and R2 smoke tests; continuation for large member/invite lists; reliable cleanup reconciliation for process crashes. Until these gates pass this is a reviewable implementation, not a completed production release.
+Open items: deployment/restore rehearsal; real Resend and R2 smoke tests; continuation for large member/invite lists; reliable cleanup reconciliation for process crashes. Until these gates pass this is a reviewable implementation, not a completed production release.
