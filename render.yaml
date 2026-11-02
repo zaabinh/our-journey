@@ -34,6 +34,20 @@ services:
         sync: false
       - key: OJ_R2_SECRET_KEY
         sync: false
+      - key: OJ_PUBLIC_WEB_URL
+        sync: false
+      - key: OJ_SMTP_HOST
+        sync: false
+      - key: OJ_SMTP_PORT
+        value: "587"
+      - key: OJ_SMTP_USERNAME
+        sync: false
+      - key: OJ_SMTP_PASSWORD
+        sync: false
+      - key: OJ_SMTP_FROM
+        sync: false
+      - key: OJ_SMTP_STARTTLS
+        value: "true"
 
 databases:
   - name: our-journey-db
