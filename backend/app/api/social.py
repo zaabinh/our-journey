@@ -64,13 +64,20 @@ def unreact(memory_id: str, user: Auth, db: Db):
 @router.get("/memories/{memory_id}/reactions")
 def reactions(memory_id: str, user: Auth, db: Db):
     memory_access(db, memory_id, user)
+    items = db.scalars(
+        select(m.Reaction).where(m.Reaction.memory_id == memory_id).order_by(m.Reaction.user_id)
+    ).all()
     counts = db.execute(
         select(m.Reaction.kind, func.count())
         .where(m.Reaction.memory_id == memory_id)
         .group_by(m.Reaction.kind)
     ).all()
     mine = db.get(m.Reaction, (memory_id, user.id))
-    return {"counts": dict(counts), "mine": mine.kind if mine else None}
+    return {
+        "counts": dict(counts),
+        "mine": mine.kind if mine else None,
+        "items": [{"user_id": item.user_id, "kind": item.kind} for item in items],
+    }
 
 
 @router.patch("/comments/{comment_id}")

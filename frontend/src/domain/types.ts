@@ -24,7 +24,8 @@ export interface AlbumMember {
 }
 export interface Invite {
   id: Id;
-  token: string;
+  token?: string;
+  code?: string;
   albumId: Id;
   role: MemberRole;
   expiresAt: number;
@@ -106,6 +107,7 @@ export type Command =
       preservePhotoIds?: Id[];
     }
   | { type: 'deleteMemory'; memoryId: Id }
+  | { type: 'publishMemory'; memoryId: Id }
   | { type: 'reorder'; albumId: Id; ids: Id[] }
   | { type: 'createInvite'; albumId: Id; role: MemberRole; expiresAt: number }
   | { type: 'revokeInvite'; inviteId: Id }

@@ -95,7 +95,7 @@ export function SettingsPage() {
               <MemberSettings albumId={albumId} />
             </section>
 
-            {repo.mode !== 'remote' && <section className="settings-card settings-invites-card" aria-label="Lời mời">
+            <section className="settings-card settings-invites-card" aria-label="Lời mời">
               <div className="settings-card-heading">
                 <span className="settings-step">03</span>
                 <div>
@@ -103,17 +103,19 @@ export function SettingsPage() {
                 </div>
               </div>
               <InviteSettings albumId={albumId} />
-            </section>}
+            </section>
 
-            {repo.mode !== 'remote' && <section className="settings-card settings-import-card" aria-label="Nhập dữ liệu">
-              <div className="settings-card-heading">
-                <span className="settings-step">04</span>
-                <div>
-                  <p className="settings-overline">CHUYỂN KỶ NIỆM</p>
+            {repo.mode !== 'remote' && (
+              <section className="settings-card settings-import-card" aria-label="Nhập dữ liệu">
+                <div className="settings-card-heading">
+                  <span className="settings-step">04</span>
+                  <div>
+                    <p className="settings-overline">CHUYỂN KỶ NIỆM</p>
+                  </div>
                 </div>
-              </div>
-              <LegacyImport albumId={albumId} />
-            </section>}
+                <LegacyImport albumId={albumId} />
+              </section>
+            )}
 
             <section className="settings-danger-zone" aria-labelledby="delete-album-title">
               <div>

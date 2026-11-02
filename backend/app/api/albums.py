@@ -130,17 +130,51 @@ def invite(album_id: str, body: s.InviteCreate, user: Auth, db: Db):
 
 
 @router.get("/albums/{album_id}/invites")
-def invites(album_id: str, user: Auth, db: Db):
-    album_access(db, album_id, user, owner=True)
-    rows = db.scalars(select(m.Invite).where(m.Invite.album_id == album_id).limit(100)).all()
+def invites(
+    album_id: str,
+    user: Auth,
+    db: Db,
+    cursor: str | None = None,
+    limit: int = Query(20, ge=1, le=100),
+):
+    album, _ = album_access(db, album_id, user, owner=True)
+    query = select(m.Invite).where(m.Invite.album_id == album_id)
+    rows, next_cursor = page(query, db, m.Invite.id, cursor, limit)
     return {
+        "next_cursor": next_cursor,
         "items": [
             {
                 k: getattr(i, k)
                 for k in ("id", "role", "expires_at", "revoked", "used_count", "max_uses")
             }
             for i in rows
-        ]
+        ],
+        "album_title": album.title,
+    }
+
+
+@router.post("/invites/preview")
+def preview_invite(body: s.Redeem, user: Auth, db: Db):
+    del user
+    inv = db.scalar(
+        select(m.Invite).where(
+            or_(
+                m.Invite.token_hash == digest(body.secret),
+                m.Invite.code_hash == digest(body.secret.upper()),
+            )
+        )
+    )
+    if not inv:
+        return {"status": "invalid"}
+    album = db.get(m.Album, inv.album_id)
+    if not album or album.deleted:
+        return {"status": "invalid"}
+    status = "revoked" if inv.revoked else "expired" if inv.expires_at <= m.now() else "active"
+    return {
+        "status": status,
+        "album_id": album.id,
+        "title": album.title,
+        "role": inv.role,
     }
 
 

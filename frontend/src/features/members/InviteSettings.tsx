@@ -19,11 +19,8 @@ export function InviteSettings({ albumId }: { albumId: string }) {
   const invites = state!.invites.filter((i) => i.albumId === albumId);
   return (
     <section>
-      <h2>Lời mời demo</h2>
-      <p>
-        Chỉ hoạt động trong cùng datastore trình duyệt này. Liên kết/mã sẽ không hoạt động trên
-        thiết bị khác cho tới khi có backend.
-      </p>
+      <h2>Lời mời thành viên</h2>
+      <p>Tạo liên kết hoặc mã dùng một lần để mời người khác vào album.</p>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -34,7 +31,9 @@ export function InviteSettings({ albumId }: { albumId: string }) {
               role,
               expiresAt: new Date(expiry).getTime(),
             });
-            setNotice('Đã tạo lời mời demo local.');
+            setNotice(
+              'Đã tạo lời mời. Hãy sao chép liên kết hoặc mã để chia sẻ; bí mật chỉ hiển thị ngay sau khi tạo.',
+            );
             setSaved(true);
           });
         }}
@@ -64,14 +63,14 @@ export function InviteSettings({ albumId }: { albumId: string }) {
           disabled={action.pending}
         />
         <Button type="submit" disabled={action.pending}>
-          Tạo lời mời demo
+          {action.pending ? 'Đang tạo…' : 'Tạo lời mời'}
         </Button>
       </form>
       {action.error && <Alert>{action.error}</Alert>}
       <Toast>{notice}</Toast>
       <ul className="invites">
         {invites.map((invite) => {
-          const url = `${window.location.origin}/join/${invite.token}`,
+          const url = invite.token ? `${window.location.origin}/join/${invite.token}` : '',
             status = invite.revoked
               ? 'Đã thu hồi'
               : invite.expiresAt <= Date.now()
@@ -83,16 +82,23 @@ export function InviteSettings({ albumId }: { albumId: string }) {
                 {invite.role === 'viewer' ? 'Chỉ xem' : 'Đóng góp'} · {status} ·{' '}
                 {new Date(invite.expiresAt).toLocaleString('vi-VN')}
               </p>
-              <Input label="Mã mời demo" value={invite.token} readOnly />
-              <Input label="Liên kết demo" value={url} readOnly />
+              {invite.code && <Input label="Mã mời" value={invite.code} readOnly />}
+              {url ? (
+                <Input label="Liên kết mời" value={url} readOnly />
+              ) : (
+                <p>
+                  Mã bí mật chỉ hiển thị một lần khi tạo. Lời mời này đã được lưu an toàn; hãy tạo
+                  lời mời mới nếu cần chia sẻ lại.
+                </p>
+              )}
               <div className="actions">
                 <Button
                   variant="secondary"
-                  disabled={action.pending}
+                  disabled={action.pending || !url}
                   onClick={() =>
                     void action.run(async () => {
                       await navigator.clipboard.writeText(url);
-                      setNotice('Đã sao chép liên kết demo. Chỉ dùng được trên datastore này.');
+                      setNotice('Đã sao chép liên kết mời.');
                     })
                   }
                 >

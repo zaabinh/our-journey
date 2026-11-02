@@ -18,6 +18,7 @@ export function App() {
         <Route path="/albums/:albumId/settings" element={<SettingsPage />} />
         <Route path="/albums/:albumId/memories/:memoryId" element={<MemoryPage />} />
         <Route path="/join/:token" element={<JoinPage />} />
+        <Route path="/join" element={<JoinPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />

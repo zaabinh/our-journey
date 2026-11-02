@@ -41,6 +41,16 @@ export function MemoryPage() {
               <div className="memory-detail-tools">
                 {canEdit(role, memory.authorId, actor) && (
                   <div className="memory-detail-actions">
+                    {memory.published === false && (
+                      <Button
+                        disabled={action.pending || photos.length === 0}
+                        onClick={() =>
+                          void action.run(() => dispatch({ type: 'publishMemory', memoryId }))
+                        }
+                      >
+                        {action.pending ? 'Đang xuất bản…' : 'Xuất bản kỷ niệm'}
+                      </Button>
+                    )}
                     <MemoryForm
                       key={memory.id}
                       albumId={albumId}
@@ -58,6 +68,9 @@ export function MemoryPage() {
             </div>
             <div className="memory-detail-heading">
               <span className="album-kicker">MỘT KỶ NIỆM ĐÁNG NHỚ</span>
+              {memory.published === false && (
+                <p role="status">Bản nháp · thêm ít nhất một ảnh để xuất bản.</p>
+              )}
               <h1>{memory.title}</h1>
               <div className="memory-detail-meta" aria-label="Thông tin kỷ niệm">
                 <span>{memory.dateLabel?.trim() || memory.date || 'Chưa ghi rõ ngày'}</span>

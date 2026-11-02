@@ -139,7 +139,7 @@ export function validateStore(s: Store) {
   unique(s.members.map((x) => JSON.stringify([x.albumId, x.userId])));
   unique(s.reactions.map((x) => JSON.stringify([x.memoryId, x.userId])));
   unique(s.imports.map((x) => x.key));
-  unique(s.invites.map((x) => x.token));
+  unique(s.invites.flatMap((x) => (x.token ? [x.token] : [])));
   const users = new Set(s.users.map((x) => x.id)),
     albums = new Set(s.albums.map((x) => x.id)),
     memories = new Set(s.memories.map((x) => x.id)),

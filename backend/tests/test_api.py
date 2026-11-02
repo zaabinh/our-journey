@@ -208,6 +208,8 @@ def test_invites_expiry_revoke_and_redeem_race(actors):
             "max_uses": 1,
         },
     ).json()
+    preview = owner.call("POST", "/invites/preview", json={"secret": inv["token"]}).json()
+    assert preview["status"] == "active" and preview["album_id"] == album
     users = [actors["writer"], actors["viewer"]]
     with ThreadPoolExecutor(2) as pool:
         results = list(
@@ -234,11 +236,32 @@ def test_invites_expiry_revoke_and_redeem_race(actors):
         },
     ).json()["already_member"]
     owner.call("DELETE", f"/albums/{album}/invites/{inv['id']}")
+    assert (
+        owner.call("POST", "/invites/preview", json={"secret": inv["token"]}).json()["status"]
+        == "revoked"
+    )
     assert winner.call("POST", "/invites/redeem", json={"secret": inv["token"]}).status_code == 404
     inv2 = owner.call("POST", f"/albums/{album}/invites", json={"role": "viewer"}).json()
     with SessionLocal.begin() as db:
         db.get(m.Invite, inv2["id"]).expires_at = m.now() - timedelta(seconds=1)
+    assert (
+        owner.call("POST", "/invites/preview", json={"secret": inv2["token"]}).json()["status"]
+        == "expired"
+    )
     assert winner.call("POST", "/invites/redeem", json={"secret": inv2["token"]}).status_code == 404
+
+
+def test_invite_list_uses_cursor_pagination(actors):
+    owner = actors["owner"]
+    album = owner.album()["id"]
+    for _ in range(3):
+        owner.call("POST", f"/albums/{album}/invites", json={"role": "viewer"})
+    first = owner.call("GET", f"/albums/{album}/invites?limit=2").json()
+    assert len(first["items"]) == 2 and first["next_cursor"]
+    second = owner.call(
+        "GET", f"/albums/{album}/invites?limit=2&cursor={first['next_cursor']}"
+    ).json()
+    assert len(second["items"]) == 1 and second["next_cursor"] is None
 
 
 def test_comments_and_idempotent_reactions(actors):
@@ -273,7 +296,9 @@ def test_comments_and_idempotent_reactions(actors):
             writer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "heart"}).status_code
             == 204
         )
-    assert writer.call("GET", f"/memories/{mem}/reactions").json()["counts"] == {"heart": 1}
+    response = writer.call("GET", f"/memories/{mem}/reactions").json()
+    assert response["counts"] == {"heart": 1}
+    assert response["items"] == [{"user_id": writer.user["id"], "kind": "heart"}]
     writer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "like"})
     assert writer.call("GET", f"/memories/{mem}/reactions").json()["counts"] == {"like": 1}
     assert viewer.call("PUT", f"/memories/{mem}/reaction", json={"kind": "like"}).status_code == 403
