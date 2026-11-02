@@ -1,0 +1,85 @@
+.profile-card {
+  max-width: 576px;
+  margin-inline: auto;
+  padding: 24px;
+}
+.profile-avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.profile-card .avatar {
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 4px #fbe4ea,
+    0 4px 12px #4a123226;
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+.profile-card .avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.profile-avatar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.profile-card .field input:focus {
+  border-color: var(--accent);
+  outline: none;
+  box-shadow: 0 0 0 3px #b6465f24;
+}
+.profile-email {
+  position: relative;
+}
+.profile-email input[readonly] {
+  background: #f9fafb;
+  color: var(--ink-muted);
+  padding-right: 40px;
+}
+.profile-lock {
+  position: absolute;
+  right: 14px;
+  bottom: 14px;
+  color: var(--ink-muted);
+  pointer-events: none;
+}
+.profile-card form > .button {
+  display: block;
+  margin-left: auto;
+  min-height: 44px;
+  padding: 10px 24px;
+  background: #4a1220;
+  color: #fdf8f7;
+}
+.profile-card form > .button:hover:not(:disabled) {
+  background: #5e1a2c;
+}
+@media (max-width: 600px) {
+  .profile-card {
+    padding: 16px;
+  }
+  .profile-card form > .button {
+    width: 100%;
+  }
+}
