@@ -1,4 +1,3 @@
-import getpass
 import json
 import urllib.error
 import urllib.request
