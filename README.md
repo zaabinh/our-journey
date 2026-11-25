@@ -1,236 +1,155 @@
-# Our Journey - Photo Gallery Web Application
+# Our Journey
 
-Frontend React mới đang được phát triển riêng trong [`frontend/`](frontend/README.md), chạy bằng dữ liệu demo tổng hợp. HTML/CSS/JS cũ và dữ liệu đã track được giữ nguyên. Trạng thái từng phase, kiểm thử và blocker migration nằm trong [`docs/FRONTEND_PROGRESS.md`](docs/FRONTEND_PROGRESS.md). Chưa có export từ browser origin cũ; không dùng dữ liệu thật làm fixture và không deploy.
+**A local-first digital memory journal for collecting, organizing, and revisiting meaningful moments.**
 
-A responsive, interactive photo gallery web application that allows users to share and manage memories from their journey together. Built with vanilla HTML, CSS, and JavaScript.
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)
+![Storage](https://img.shields.io/badge/Storage-IndexedDB-475569)
+![Status](https://img.shields.io/badge/Status-In%20Development-orange)
+
+## Overview
+
+Our Journey is a responsive photo gallery and personal memory management application. It brings albums, photographs, stories, and social interactions into a single browser-based experience.
+
+Originally developed with vanilla HTML, CSS, and JavaScript, the project is evolving into a modular React and TypeScript application with local-first persistence, reusable UI components, and automated quality checks.
+
+> **Development status:** The modern frontend runs independently with synthetic demo data. Production deployment and complete legacy-data migration remain blocked pending privacy and migration checks.
 
 ## Features
 
-### 🏠 Home Page
-- Welcoming landing page with site branding
-- Quick navigation to album and authentication pages
-- Responsive design for all device sizes
-- Hero section with call-to-action buttons
+| Area | Capabilities |
+| --- | --- |
+| Albums | Create, edit, organize, and manage album covers |
+| Memories | Multi-image upload, stories, metadata, search, sorting, and reordering |
+| Photo viewer | Image previews, full-resolution viewing, and responsive layouts |
+| Collaboration demo | Local invitations, membership roles, comments, and reactions |
+| Data portability | Legacy import dry-run, explicit owner mapping, versioned backups, and restore |
+| User experience | Responsive navigation, accessible dialogs, keyboard interactions, and reduced-motion support |
+| Image performance | Generated thumbnails with a maximum long edge of 640 px; originals retained for viewing |
 
-### 📸 Album Page
-- Interactive photo grid gallery with responsive layouts
-  - 1 column on mobile, 2 columns on tablet, 3+ columns on desktop
-- Photo detail view with image carousel/swiper functionality
-- Search and filter functionality (by title, date, location)
-- Add, edit, and delete photos (for authenticated users)
-- Photo information display (title, date, location, description)
-- Drag and drop support for reordering photos
+Collaboration and identity features operate within the local datastore. They do not provide server-side authentication, remote invitations, or cross-device synchronization.
 
-### 👤 User Authentication
-- **Sign Up**: Create new account with username, email, and password
-  - Username uniqueness validation
-  - Email format validation
-  - Password strength indicator (weak/medium/strong)
-  - Password confirmation matching
-  - Real-time validation feedback
-- **Login**: Secure login with username and password
-  - Client-side validation with error messages
-  - Real-time feedback for invalid inputs
-- **User Profile**: View and manage user profile information
-- **Sign Out**: Logout functionality with session cleanup
+## Architecture
 
-### 📱 Responsive Design
-- Mobile-first approach with media queries
-- Optimized for mobile (<768px), tablet (768-1024px), and desktop (>1024px)
-- Touch-friendly interface elements
-- No horizontal scrolling on any device
-
-### 💾 Data Management
-- Browser-based storage using localStorage
-- Photo gallery data persistence
-- User authentication data storage (mock/client-side)
-- Data backup and recovery functionality
-
-## Project Structure
-
-```
-our-journey/
-├── README.md                          # Project documentation
-├── index.html                         # Home page (entry point)
-├── album.html                         # Photo gallery page
-├── login_page.html                    # Login page
-├── signup_page.html                   # Sign up page
-├── profile.html                       # User profile page
-├── style_home.css                     # Home page styling
-├── style_album.css                    # Album page styling
-├── style_login.css                    # Login/signup styling
-├── script.js                          # Main application logic
-├── auth.js                            # Authentication functions
-├── db.js                              # Data management and localStorage
-├── assets/
-│   ├── icon/                          # Site icons and branding
-│   ├── font/                          # Custom fonts
-│   └── img/
-│       ├── photo_gallery_data.json    # Photo gallery data
-│       └── OurJourney/                # Photo assets
-├── TODO.md                            # Project tasks summary
-└── TODO_detailed.md                   # Detailed task breakdown
+```mermaid
+flowchart TD
+    A[React UI and Router] --> B[Async JourneyRepository]
+    B --> C[Domain Models and Access Policies]
+    B --> D[IndexedDB Persistence]
+    D --> E[Metadata Store]
+    D --> F[Photo Blob Store]
+    G[Legacy Import and Backup Tools] --> B
 ```
 
-## Getting Started
-
-### Prerequisites
-- Modern web browser (Chrome, Firefox, Edge, Safari)
-- No server or build tools required
-
-### Installation
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd our-journey
-   ```
-
-2. Open the application:
-   - Navigate to the project directory
-   - Open `home.html` (or `index.html`) in your web browser
-   - Or use a local server:
-     ```bash
-     # Using Python
-     python -m http.server 8000
-     # Then visit http://localhost:8000
-     ```
-
-### Usage
-1. **Browse Photos**: Navigate to the Album page to view the photo gallery
-2. **Search/Filter**: Use the search bar to filter photos by title, date, or location
-3. **View Details**: Click on a photo card to view full details and image carousel
-4. **Create Account**: Click "Sign Up" to create a new user account
-5. **Manage Photos**: After login, add, edit, or delete photos from the gallery
-6. **Profile**: Visit your profile page to manage account information
+- **Presentation:** React components, route-based navigation, shared UI primitives, and Radix Dialog.
+- **Domain:** Album, memory, membership, and interaction rules separated from presentation.
+- **Persistence:** Asynchronous repository abstraction over IndexedDB, with separate metadata and photo storage.
+- **Data integrity:** Import validation, deduplication, checkpoints, checksums, and non-destructive restore.
+- **Access policies:** Local owner, contributor, viewer, and outsider permission checks; not a server security boundary.
 
 ## Technology Stack
 
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Styling**: CSS Grid, Flexbox, Media Queries
-- **Storage**: localStorage (browser-based)
-- **Carousel**: Swiper.js (for image navigation)
-- **Authentication**: Client-side mock (localStorage-based)
+| Layer | Technologies |
+| --- | --- |
+| Frontend | React 19, TypeScript 5.9, React Router 7 |
+| Build tooling | Vite 8, npm |
+| UI | CSS, Radix UI Dialog |
+| Persistence | IndexedDB, Blob storage |
+| Unit and integration testing | Vitest, Testing Library, fake-indexeddb |
+| End-to-end testing | Playwright (Chromium, Firefox, WebKit) |
+| Accessibility | axe-core, keyboard and reduced-motion checks |
+| Code quality | ESLint, Prettier, TypeScript strict mode |
+| CI | GitHub Actions |
 
-## Features in Development
+## Getting Started
 
-- [ ] Lazy loading for images (Intersection Observer API)
-- [ ] Image pagination/infinite scroll
-- [ ] Image compression and optimization
-- [ ] Advanced filtering options
-- [ ] Export/download photo albums
-- [ ] Backend integration for persistent storage
-- [ ] Real user authentication (OAuth/JWT)
-- [ ] Image upload functionality
-- [ ] Comments and ratings on photos
-- [ ] Social sharing features
+**Requirements:** Node.js 22.12 or newer and npm.
 
-## Browser Compatibility
-
-| Browser | Version | Status |
-|---------|---------|--------|
-| Chrome  | Latest  | ✅ Supported |
-| Firefox | Latest  | ✅ Supported |
-| Safari  | Latest  | ✅ Supported |
-| Edge    | Latest  | ✅ Supported |
-
-## Data Structure
-
-### Photo Object
-```javascript
-{
-  id: string,
-  title: string,
-  date: string (YYYY-MM-DD),
-  location: string,
-  description: string,
-  images: Array<{
-    src: string,
-    alt: string
-  }>,
-  updatedAt: number
-}
+```bash
+git clone https://github.com/zaabinh/our-journey.git
+cd our-journey/frontend
+npm ci
+npm run dev
 ```
 
-### User Object
-```javascript
-{
-  username: string,
-  password: string (hashed in production),
-  email: string,
-  createdAt: number,
-  updatedAt: number
-}
+Open the local URL printed by Vite. The development server binds to localhost and uses synthetic demo data. No backend or external account is required.
+
+### Quality checks
+
+Run from the `frontend/` directory:
+
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm test -- --run
+npx playwright install chromium webkit firefox
+npm run test:e2e
+npm run build
+npm run check:private
 ```
 
-## Important Notes
+WebKit tests use a persistent synthetic profile because ephemeral/private WebKit contexts have limitations storing Blobs in IndexedDB.
 
-⚠️ **Security Warning**: The current implementation uses client-side authentication with localStorage. This is suitable for development and learning purposes only. For production:
-- Implement proper backend authentication (OAuth, JWT)
-- Use secure password hashing (bcrypt, Argon2)
-- Use HTTPS and secure cookies
-- Implement CSRF protection
-- Validate all inputs on the server
+## Engineering and Validation
 
-## Future Improvements
+The [frontend progress report](docs/FRONTEND_PROGRESS.md) records the following historical validation milestones:
 
-1. **Backend Integration**
-   - Node.js/Express or similar backend framework
-   - Database (MongoDB, PostgreSQL, etc.)
-   - Real authentication and authorization
+| Check | Recorded result |
+| --- | --- |
+| Unit and integration tests | 33 passing in the documented later regression run |
+| Cross-browser E2E | 81 passing in the earlier full three-engine run |
+| Accessibility | 60 axe scans without violations in that full run |
+| Static checks and build | Passing in documented regression runs |
 
-2. **Performance**
-   - Image optimization and CDN
-   - Code splitting and lazy loading
-   - Service workers for offline support
+These are historical results, not a claim that the current commit has been independently retested. Later UI changes had incomplete cross-browser regression coverage, including a WebKit timeout and a Firefox runner initialization failure.
 
-3. **Features**
-   - Real-time updates with WebSockets
-   - Collaborative features
-   - Advanced search with AI tagging
-   - Mobile app version
+## Repository Layout
 
-## Development
+```text
+our-journey/
+├── frontend/             # Modern React + TypeScript application
+│   ├── src/              # UI, domain and persistence implementation
+│   ├── e2e/              # Browser regression tests
+│   ├── package.json
+│   └── README.md
+├── docs/
+│   └── FRONTEND_PROGRESS.md
+├── scripts/              # Verification and privacy checks
+├── .github/workflows/    # Frontend CI
+└── Legacy HTML/CSS/JS    # Original implementation retained at root
+```
 
-### Adding New Features
-1. Create feature branches following git workflow
-2. Update TODO.md and TODO_detailed.md
-3. Test responsive design across all breakpoints
-4. Ensure no console errors or warnings
+## Privacy, Security and Migration
 
-### Testing
-- Use browser DevTools to simulate different device sizes
-- Test touch interactions on mobile devices
-- Verify form validation and error handling
-- Check localStorage data persistence
+This is a local-first development prototype, not a production multi-user service.
 
-## Contributing
+- The modern frontend uses synthetic fixtures and does not import legacy credentials or sessions.
+- Legacy browser authentication is a mock implementation and must not be used as production authentication.
+- The original browser-origin IndexedDB export is still required for complete migration.
+- Legacy private media remain tracked in Git. The release privacy gate intentionally fails until remediation is complete. Removing tracked files alone would not remove historical copies.
+- Do not publish legacy assets, browser exports, private backups, or QA artifacts.
 
-When contributing:
-1. Follow the existing code style
-2. Update documentation and TODOs
-3. Test responsive design
-4. Ensure backward compatibility
-5. Add meaningful commit messages
+The build privacy scanner is an additional safeguard, not a substitute for manual review. Deployment remains blocked.
 
-## License
+## Roadmap
 
-[Add license information here]
+- [x] Modern React and TypeScript frontend foundation
+- [x] Local-first album and memory management
+- [x] Local collaboration and permission policies
+- [x] Backup, restore, and legacy import tooling
+- [x] Responsive UI, thumbnails, and accessibility checks
+- [ ] Complete legacy browser-data export and migration
+- [ ] Resolve tracked private-data exposure and pass the release gate
+- [ ] Complete outstanding browser regression checks
+- [ ] Evaluate backend authentication, secure remote storage, and cross-device synchronization
 
-## Support
+## Documentation
 
-For issues, questions, or suggestions:
-- Check existing issues in the repository
-- Create a detailed bug report
-- Include browser version and device information
-- Provide steps to reproduce issues
-
-## Acknowledgments
-
-- Built as part of Full Stack Development Course
-- Photo Gallery Project - Front-end Implementation
-- Community feedback and contributions
+- [Frontend setup and development](frontend/README.md)
+- [Implementation progress, validation, and migration blockers](docs/FRONTEND_PROGRESS.md)
 
 ---
 
-**Last Updated**: December 2025
-**Status**: Active Development
+Developed as a full-stack development course project and evolving personal software engineering project.
