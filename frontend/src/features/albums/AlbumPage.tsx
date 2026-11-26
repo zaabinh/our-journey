@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
-import { canEdit, canManage, canWrite, roleOf } from '../../domain/policy';
+import { canManage, canWrite, roleOf } from '../../domain/policy';
 import { CardGridSkeleton } from '../../components/ui/skeletons';
 import { DataBoundary } from '../../components/DataBoundary';
 import { Alert, Button, Card, Dropdown, EmptyState, Input, Toast } from '../../components/ui';
@@ -51,10 +51,7 @@ export function AlbumPage() {
             : a.order - b.order,
       );
   const visible = filtered.slice(0, limit),
-    canReorder =
-      sort === 'order' &&
-      filtered.length > 1 &&
-      filtered.every((m) => canEdit(role, m.authorId, actor)),
+    canReorder = role === 'owner' && sort === 'order' && filtered.length > 1,
     visibleKey = visible.map((m) => m.id).join('|');
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAction, useJourney } from '../../app/JourneyProvider';
 import { useUnsavedChanges } from '../../app/useUnsavedChanges';
+import { preparePhoto } from '../../data/codec';
 import { DataTools } from './DataTools';
 import { DataBoundary } from '../../components/DataBoundary';
 import './profile.css';
@@ -11,6 +12,7 @@ function ProfileForm() {
     user = state!.users.find((u) => u.id === actor)!;
   const [name, setName] = useState(user.name),
     [email, setEmail] = useState(user.email),
+    [avatarError, setAvatarError] = useState(''),
     [notice, setNotice] = useState(''),
     action = useAction(),
     fileRef = useRef<HTMLInputElement>(null);
@@ -37,7 +39,15 @@ function ProfileForm() {
               onChange={(event) => {
                 const file = event.target.files?.[0];
                 if (!file) return;
+                setAvatarError('');
                 void action.run(async () => {
+                  try {
+                    if (file.size > 15 * 1024 * 1024) throw Error('Ảnh tối đa 15 MB.');
+                    await preparePhoto(file);
+                  } catch (e) {
+                    setAvatarError(e instanceof Error ? e.message : 'Ảnh không hợp lệ.');
+                    return;
+                  }
                   const api = repo as typeof repo & {
                     uploadAvatar?: (file: Blob) => Promise<unknown>;
                   };
@@ -47,6 +57,7 @@ function ProfileForm() {
                 });
               }}
             />
+            {avatarError && <p role="alert">{avatarError}</p>}
             <Button
               variant="secondary"
               disabled={action.pending}
@@ -86,6 +97,7 @@ function ProfileForm() {
         <Input
           disabled={action.pending}
           label="Tên hiển thị"
+          error={action.fieldErrors.display_name}
           value={name}
           onChange={(e) => setName(e.target.value)}
           required

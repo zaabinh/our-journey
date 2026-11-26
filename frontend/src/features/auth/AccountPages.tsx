@@ -64,6 +64,47 @@ function PasswordPolicy({ password }: { password: string }) {
   );
 }
 
+function PasswordField({
+  label,
+  value,
+  onChange,
+  onBlur,
+  error,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  error?: string;
+}) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="auth-password-field">
+      <Input
+        label={label}
+        type={visible ? 'text' : 'password'}
+        autoComplete="new-password"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        onBlur={onBlur}
+        error={error}
+        required
+        minLength={10}
+        maxLength={128}
+      />
+      <button
+        type="button"
+        className="auth-password-toggle"
+        onClick={() => setVisible(!visible)}
+        aria-label={`${visible ? 'Ẩn' : 'Hiện'} ${label.toLocaleLowerCase()}`}
+        aria-pressed={visible}
+      >
+        {visible ? 'Ẩn' : 'Hiện'}
+      </button>
+    </div>
+  );
+}
+
 export function LoginPage() {
   const { state, login } = useJourney(),
     action = useAction(),
@@ -100,6 +141,7 @@ export function LoginPage() {
         >
           <Input
             label="Email hoặc tên đăng nhập"
+            error={action.fieldErrors.identifier}
             autoComplete="username"
             value={identifier}
             onChange={(event) => setIdentifier(event.target.value)}
@@ -108,6 +150,7 @@ export function LoginPage() {
           />
           <Input
             label="Mật khẩu"
+            error={action.fieldErrors.password}
             type="password"
             autoComplete="current-password"
             value={password}
@@ -158,8 +201,35 @@ export function SignupPage() {
   const [name, setName] = useState(''),
     [username, setUsername] = useState(''),
     [email, setEmail] = useState(''),
-    [password, setPassword] = useState('');
-  useUnsavedChanges(!action.pending && !!(name || username || email || password));
+    [password, setPassword] = useState(''),
+    [confirmation, setConfirmation] = useState(''),
+    [touched, setTouched] = useState<Record<string, boolean>>({}),
+    [submitted, setSubmitted] = useState(false);
+  const errors = {
+    name: !name.trim()
+      ? 'Vui lòng nhập tên hiển thị.'
+      : name.trim().length > 100
+        ? 'Tên tối đa 100 ký tự.'
+        : '',
+    username: !/^[a-zA-Z0-9_.-]{3,64}$/.test(username.trim())
+      ? 'Tên đăng nhập gồm 3–64 ký tự chữ, số, _, . hoặc -.'
+      : '',
+    email:
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254
+        ? 'Vui lòng nhập email hợp lệ.'
+        : '',
+    password:
+      password.length < 10 || password.length > 128 ? 'Mật khẩu cần từ 10 đến 128 ký tự.' : '',
+    confirmation: !confirmation
+      ? 'Vui lòng xác nhận mật khẩu.'
+      : confirmation !== password
+        ? 'Mật khẩu xác nhận không khớp'
+        : '',
+  };
+  const show = (field: keyof typeof errors) => (submitted || touched[field] ? errors[field] : '');
+  const touch = (field: keyof typeof errors) =>
+    setTouched((current) => ({ ...current, [field]: true }));
+  useUnsavedChanges(!action.pending && !!(name || username || email || password || confirmation));
   if (state) return <Navigate replace to="/albums" />;
   return (
     <section className="auth-page auth-page-signup" aria-labelledby="auth-title">
@@ -174,8 +244,11 @@ export function SignupPage() {
         </header>
         <form
           className="auth-form auth-form-signup"
+          noValidate
           onSubmit={(event) => {
             event.preventDefault();
+            setSubmitted(true);
+            if (Object.values(errors).some(Boolean)) return;
             void action.run(async () => {
               await register({
                 display_name: name.trim(),
@@ -193,6 +266,8 @@ export function SignupPage() {
               autoComplete="name"
               value={name}
               onChange={(event) => setName(event.target.value)}
+              onBlur={() => touch('name')}
+              error={show('name') || action.fieldErrors.display_name}
               required
               maxLength={100}
             />
@@ -201,6 +276,8 @@ export function SignupPage() {
               autoComplete="username"
               value={username}
               onChange={(event) => setUsername(event.target.value)}
+              onBlur={() => touch('username')}
+              error={show('username') || action.fieldErrors.username}
               required
               minLength={3}
               maxLength={64}
@@ -212,21 +289,29 @@ export function SignupPage() {
               autoComplete="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
+              onBlur={() => touch('email')}
+              error={show('email') || action.fieldErrors.email}
               required
               maxLength={254}
             />
-            <Input
-              label="Mật khẩu"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={10}
-              maxLength={128}
-            />
             <div className="auth-field-wide">
+              <PasswordField
+                label="Mật khẩu"
+                value={password}
+                onChange={setPassword}
+                onBlur={() => touch('password')}
+                error={show('password') || action.fieldErrors.password}
+              />
               <PasswordPolicy password={password} />
+            </div>
+            <div className="auth-field-wide">
+              <PasswordField
+                label="Xác nhận mật khẩu"
+                value={confirmation}
+                onChange={setConfirmation}
+                onBlur={() => touch('confirmation')}
+                error={show('confirmation')}
+              />
             </div>
           </div>
           {action.error && (
@@ -270,7 +355,9 @@ function ResendVerification() {
     >
       <Input
         label="Gửi lại email xác minh"
+        error={action.fieldErrors.email}
         type="email"
+        maxLength={254}
         autoComplete="email"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
@@ -344,7 +431,9 @@ export function AccountLinkPage({ mode }: { mode: 'verify' | 'forgot' | 'reset' 
             {mode === 'forgot' && (
               <Input
                 label="Email"
+                error={action.fieldErrors.email}
                 type="email"
+                maxLength={254}
                 autoComplete="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -355,6 +444,7 @@ export function AccountLinkPage({ mode }: { mode: 'verify' | 'forgot' | 'reset' 
               <>
                 <Input
                   label="Mật khẩu mới"
+                  error={action.fieldErrors.password}
                   type="password"
                   autoComplete="new-password"
                   minLength={10}

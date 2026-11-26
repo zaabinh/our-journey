@@ -138,7 +138,7 @@ export function CommentsPanel({ memoryId, albumId }: { memoryId: string; albumId
                     label="Sửa bình luận"
                     value={editText}
                     onChange={(event) => setEditText(event.target.value)}
-                    maxLength={5000}
+                    maxLength={4000}
                     required
                     disabled={action.pending}
                   />
@@ -186,7 +186,7 @@ export function CommentsPanel({ memoryId, albumId }: { memoryId: string; albumId
             value={newText}
             onChange={(event) => setNewText(event.target.value)}
             required
-            maxLength={5000}
+            maxLength={4000}
             disabled={action.pending}
           />
           <Button type="submit" disabled={action.pending || !newText.trim()}>

@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Memory } from '../../domain/types';
-import { useAction, useJourney } from '../../app/JourneyProvider';
+import { errorMessage, useAction, useJourney } from '../../app/JourneyProvider';
 import { useUnsavedChanges } from '../../app/useUnsavedChanges';
 import { preparePhoto } from '../../data/codec';
 import { Alert, Button, Dialog, Input, Textarea } from '../../components/ui';
 import { BlobImage } from './Photo';
+type PhotoItem =
+  | { kind: 'saved'; id: string; key: string }
+  | { kind: 'new'; blob: Blob; key: string };
 const today = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -22,7 +25,7 @@ export function MemoryForm({
   onClose: () => void;
   trigger?: React.ReactNode;
 }) {
-  const { state, dispatch } = useJourney(),
+  const { state, dispatch, repo } = useJourney(),
     action = useAction();
   const [title, setTitle] = useState(memory?.title ?? ''),
     [date, setDate] = useState(memory ? memory.date : today()),
@@ -32,36 +35,38 @@ export function MemoryForm({
     [gift, setGift] = useState(!!memory?.animations.gift);
   const previewCache = useRef(new WeakMap<Blob, Blob>());
   const storyRef = useRef<HTMLTextAreaElement>(null);
-  const [initial, setInitial] = useState(
-      () =>
-        memory?.photoIds
-          .map((id) => state!.photos.find((p) => p.id === id)!)
-          .filter((p) => !p.src)
-          .map((p) => p.blob) ?? [],
-    ),
-    [blobs, setBlobs] = useState<Blob[]>(initial),
-    [preservedPhotoIds, setPreservedPhotoIds] = useState<string[]>(
-      () => memory?.photoIds.filter((id) => !!state!.photos.find((p) => p.id === id)?.src) ?? [],
-    ),
-    [initialPreservedPhotoIds, setInitialPreservedPhotoIds] = useState(preservedPhotoIds);
+  const initialPhotoItems = () =>
+    (memory?.photoIds ?? []).flatMap((id): PhotoItem[] => {
+      const photo = state?.photos.find((p) => p.id === id);
+      if (!photo) return [];
+      return [
+        photo.src ? { kind: 'saved', id, key: id } : { kind: 'new', blob: photo.blob, key: id },
+      ];
+    });
+  const [initialItems, setInitialItems] = useState<PhotoItem[]>(initialPhotoItems),
+    [items, setItems] = useState<PhotoItem[]>(initialItems),
+    [dropActive, setDropActive] = useState(false),
+    [uploadError, setUploadError] = useState(''),
+    [dragKey, setDragKey] = useState(''),
+    [overKey, setOverKey] = useState('');
   useEffect(() => {
     if (open) {
+      setUploadError('');
+      setDropActive(false);
       setTitle(memory?.title ?? '');
       setDate(memory ? memory.date : today());
       setLocation(memory?.location ?? '');
       setNote(memory?.note ?? '');
       setHeart(!!memory?.animations.heart);
       setGift(!!memory?.animations.gift);
-      const photos = memory?.photoIds.map((id) => state!.photos.find((p) => p.id === id)!) ?? [],
-        current = photos.filter((p) => !p.src).map((p) => p.blob),
-        remoteIds = photos.filter((p) => p.src).map((p) => p.id);
-      for (const p of photos.filter((photo) => !photo.src)) {
-        previewCache.current.set(p.blob, p.thumbnail ?? p.blob);
+      const next = initialPhotoItems();
+      for (const item of next) {
+        if (item.kind !== 'new') continue;
+        const photo = state?.photos.find((p) => p.id === item.key);
+        previewCache.current.set(item.blob, photo?.thumbnail ?? item.blob);
       }
-      setInitial(current);
-      setBlobs(current);
-      setPreservedPhotoIds(remoteIds);
-      setInitialPreservedPhotoIds(remoteIds);
+      setInitialItems(next);
+      setItems(next);
     }
   }, [open]);
   function format(marker: string) {
@@ -82,20 +87,46 @@ export function MemoryForm({
     note !== (memory?.note ?? '') ||
     heart !== !!memory?.animations.heart ||
     gift !== !!memory?.animations.gift ||
-    blobs.length !== initial.length ||
-    blobs.some((b, i) => b !== initial[i]) ||
-    preservedPhotoIds.length !== initialPreservedPhotoIds.length ||
-    preservedPhotoIds.some((id, i) => id !== initialPreservedPhotoIds[i]);
+    items.length !== initialItems.length ||
+    items.some((item, i) => item.key !== initialItems[i].key);
   useUnsavedChanges(open && dirty);
   function move(index: number, step: number) {
-    const next = [...blobs];
-    [next[index], next[index + step]] = [next[index + step], next[index]];
-    setBlobs(next);
+    setItems((current) => {
+      const next = [...current];
+      [next[index], next[index + step]] = [next[index + step], next[index]];
+      return next;
+    });
   }
-  function moveSaved(index: number, step: number) {
-    const next = [...preservedPhotoIds];
-    [next[index], next[index + step]] = [next[index + step], next[index]];
-    setPreservedPhotoIds(next);
+  async function addFiles(files: File[]) {
+    if (!files.length) return;
+    setUploadError('');
+    await action.run(async () => {
+      try {
+        if (items.length + files.length > 10 || files.some((file) => file.size > 15 * 1024 * 1024))
+          throw Error('Tối đa 10 ảnh và 15 MB mỗi ảnh.');
+        const prepared = await Promise.all(files.map(preparePhoto));
+        prepared.forEach((p, i) => previewCache.current.set(files[i], p.thumbnail ?? p.blob));
+        setItems((current) => [
+          ...current,
+          ...files.map((blob): PhotoItem => ({ kind: 'new', blob, key: crypto.randomUUID() })),
+        ]);
+      } catch (e) {
+        setUploadError(errorMessage(e));
+        throw e;
+      }
+    });
+  }
+  function dropPhoto(source: string, target: string) {
+    if (!source || source === target) return;
+    setItems((current) => {
+      const next = [...current],
+        from = next.findIndex((item) => item.key === source),
+        to = next.findIndex((item) => item.key === target);
+      if (from < 0 || to < 0) return current;
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
   }
   return (
     <Dialog
@@ -112,7 +143,11 @@ export function MemoryForm({
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          setUploadError('');
           void action.run(async () => {
+            const newItems = items.filter(
+              (item): item is Extract<PhotoItem, { kind: 'new' }> => item.kind === 'new',
+            );
             await dispatch({
               type: 'saveMemory',
               albumId,
@@ -125,15 +160,44 @@ export function MemoryForm({
                 note,
                 animations: { ...memory?.animations, heart, gift },
               },
-              blobs,
-              preservePhotoIds: preservedPhotoIds,
+              blobs: newItems.map((item) => item.blob),
+              preservePhotoIds: items
+                .filter(
+                  (item): item is Extract<PhotoItem, { kind: 'saved' }> => item.kind === 'saved',
+                )
+                .map((item) => item.id),
+              photoOrder: items.map((item) =>
+                item.kind === 'saved'
+                  ? { kind: 'saved' as const, id: item.id }
+                  : {
+                      kind: 'new' as const,
+                      index: newItems.findIndex((entry) => entry.key === item.key),
+                    },
+              ),
             });
             onClose();
           });
         }}
       >
-        <div className="field">
+        <div
+          className={`field memory-drop-zone${dropActive ? ' is-active' : ''}`}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes('Files')) {
+              event.preventDefault();
+              setDropActive(true);
+            }
+          }}
+          onDragLeave={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) setDropActive(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDropActive(false);
+            void addFiles([...event.dataTransfer.files]);
+          }}
+        >
           <label htmlFor="memory-upload">Ảnh JPEG/PNG/WebP (tối đa 10 ảnh, 15 MB/ảnh)</label>
+          <p>Kéo ảnh vào đây hoặc chọn từ thiết bị</p>
           <input
             id="memory-upload"
             type="file"
@@ -143,67 +207,74 @@ export function MemoryForm({
             onChange={(e) => {
               const input = e.currentTarget,
                 files = [...(input.files ?? [])];
-              void action.run(async () => {
-                if (
-                  blobs.length + preservedPhotoIds.length + files.length > 10 ||
-                  files.some((file) => file.size > 15 * 1024 * 1024)
-                )
-                  throw Error('Tối đa 10 ảnh và 15 MB mỗi ảnh.');
-                const prepared = await Promise.all(files.map(preparePhoto));
-                prepared.forEach((p, i) =>
-                  previewCache.current.set(files[i], p.thumbnail ?? p.blob),
-                );
-                setBlobs((current) => [...current, ...files]);
-                input.value = '';
-              });
+              void addFiles(files);
+              input.value = '';
             }}
           />
+          {uploadError && <span role="alert">{uploadError}</span>}
         </div>
         <div className="upload-previews">
-          {preservedPhotoIds.map((id, i) => {
-            const photo = state!.photos.find((candidate) => candidate.id === id);
-            if (!photo) return null;
-            return (
-              <div className="upload-preview" key={id}>
-                <BlobImage photo={photo} alt={`Ảnh hiện có ${i + 1}`} />
-                <div className="actions">
-                  <Button
-                    variant="secondary"
-                    aria-label={`Ảnh hiện có ${i + 1} lên trước`}
-                    disabled={i === 0 || action.pending}
-                    onClick={() => moveSaved(i, -1)}
-                  >
-                    ↑
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    aria-label={`Ảnh hiện có ${i + 1} xuống sau`}
-                    disabled={i === preservedPhotoIds.length - 1 || action.pending}
-                    onClick={() => moveSaved(i, 1)}
-                  >
-                    ↓
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    aria-label={`Xóa ảnh hiện có ${i + 1}`}
-                    disabled={action.pending}
-                    onClick={() =>
-                      setPreservedPhotoIds((current) => current.filter((x) => x !== id))
-                    }
-                  >
-                    ×
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-          {blobs.map((blob, i) => (
-            <div className="upload-preview" key={i}>
-              <BlobImage
-                blob={previewCache.current.get(blob) ?? blob}
-                alt={`Ảnh đã chọn ${i + 1}`}
-              />
+          {items.map((item, i) => (
+            <div
+              className={`upload-preview${overKey === item.key ? ' is-drop-target' : ''}`}
+              key={item.key}
+              onDragOver={(event) => {
+                if (dragKey || event.dataTransfer.types.includes('Files')) {
+                  event.preventDefault();
+                  setOverKey(item.key);
+                }
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (event.dataTransfer.files.length) void addFiles([...event.dataTransfer.files]);
+                else dropPhoto(event.dataTransfer.getData('text/plain') || dragKey, item.key);
+                setDragKey('');
+                setOverKey('');
+              }}
+              onDragLeave={() => setOverKey('')}
+            >
+              {item.kind === 'saved' ? (
+                <BlobImage
+                  photo={state?.photos.find((photo) => photo.id === item.id)}
+                  alt={`Ảnh ${i + 1}`}
+                />
+              ) : (
+                <BlobImage
+                  blob={previewCache.current.get(item.blob) ?? item.blob}
+                  alt={`Ảnh ${i + 1}`}
+                />
+              )}
               <div className="actions">
+                <button
+                  type="button"
+                  className="photo-drag-handle"
+                  draggable={!action.pending}
+                  disabled={action.pending || items.length < 2}
+                  aria-label={`Chuyển ảnh ${i + 1} sang vị trí kế tiếp`}
+                  aria-keyshortcuts="ArrowLeft ArrowRight"
+                  onClick={() => move(i, i === items.length - 1 ? -1 : 1)}
+                  onDragStart={(event) => {
+                    setDragKey(item.key);
+                    event.dataTransfer.effectAllowed = 'move';
+                    event.dataTransfer.setData('text/plain', item.key);
+                  }}
+                  onDragEnd={() => {
+                    setDragKey('');
+                    setOverKey('');
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowLeft' && i > 0) {
+                      event.preventDefault();
+                      move(i, -1);
+                    }
+                    if (event.key === 'ArrowRight' && i < items.length - 1) {
+                      event.preventDefault();
+                      move(i, 1);
+                    }
+                  }}
+                >
+                  ⋮⋮
+                </button>
                 <Button
                   variant="secondary"
                   aria-label={`Ảnh ${i + 1} lên trước`}
@@ -215,7 +286,7 @@ export function MemoryForm({
                 <Button
                   variant="secondary"
                   aria-label={`Ảnh ${i + 1} xuống sau`}
-                  disabled={i === blobs.length - 1 || action.pending}
+                  disabled={i === items.length - 1 || action.pending}
                   onClick={() => move(i, 1)}
                 >
                   ↓
@@ -224,7 +295,9 @@ export function MemoryForm({
                   variant="secondary"
                   aria-label={`Xóa ảnh ${i + 1}`}
                   disabled={action.pending}
-                  onClick={() => setBlobs((current) => current.filter((_, n) => n !== i))}
+                  onClick={() =>
+                    setItems((current) => current.filter((entry) => entry.key !== item.key))
+                  }
                 >
                   ×
                 </Button>
@@ -235,14 +308,16 @@ export function MemoryForm({
         <Input
           disabled={action.pending}
           label="Tiêu đề"
+          error={action.fieldErrors.title}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
-          maxLength={160}
+          maxLength={repo.mode === 'remote' ? 200 : 160}
         />
         <Input
           disabled={action.pending}
           label="Ngày kỷ niệm"
+          error={action.fieldErrors.date}
           type="date"
           value={date}
           onChange={(e) => setDate(e.target.value)}
@@ -257,6 +332,7 @@ export function MemoryForm({
         <Input
           disabled={action.pending}
           label="Địa điểm"
+          error={action.fieldErrors.location}
           value={location}
           onChange={(e) => setLocation(e.target.value)}
           maxLength={300}
@@ -276,6 +352,7 @@ export function MemoryForm({
           inputRef={storyRef}
           disabled={action.pending}
           label="Câu chuyện"
+          error={action.fieldErrors.note}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={5}
@@ -302,7 +379,7 @@ export function MemoryForm({
             Quà tặng
           </label>
         </fieldset>
-        {action.error && <Alert>{action.error}</Alert>}
+        {action.error && !uploadError && <Alert>{action.error}</Alert>}
         <Button type="submit" disabled={action.pending}>
           {action.pending ? 'Đang lưu…' : 'Lưu kỷ niệm'}
         </Button>

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { afterEach, expect, test, vi } from 'vitest';
-import { HttpRepository } from './repository';
+import { ApiError, HttpRepository } from './repository';
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status });
 
@@ -34,6 +34,158 @@ test('caches a signed-in snapshot briefly and refreshes it after an avatar chang
   await repo.uploadAvatar(new Blob(['avatar']));
   await repo.read('u1');
   expect(calls.filter((call) => call.path === '/albums')).toHaveLength(2);
+});
+
+test("revalidation sees another account's change before the snapshot TTL expires", async () => {
+  let title = 'Ban đầu';
+  let albumReads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), 'http://local.test').pathname.replace('/api/v1', '');
+      if (path === '/auth/session')
+        return json({ user: { id: 'u1', email: 'u@example.test', display_name: 'Owner' } });
+      if (path === '/albums') {
+        albumReads++;
+        return json({
+          items: [
+            {
+              id: 'a1',
+              owner_id: 'u1',
+              title,
+              description: '',
+              version: albumReads,
+              role: 'owner',
+            },
+          ],
+          next_cursor: null,
+        });
+      }
+      if (path === '/albums/a1/members')
+        return json({ items: [{ user_id: 'u1', display_name: 'Owner', role: 'owner' }] });
+      if (path === '/albums/a1/invites' || path === '/albums/a1/memories')
+        return json({ items: [], next_cursor: null });
+      throw Error(`Unhandled ${path}`);
+    }),
+  );
+  const repo = new HttpRepository();
+  expect((await repo.read('u1')).albums[0].title).toBe('Ban đầu');
+  title = 'Đã đổi từ tab khác';
+  expect((await repo.read('u1')).albums[0].title).toBe('Ban đầu');
+  repo.invalidate();
+  expect((await repo.read('u1')).albums[0].title).toBe('Đã đổi từ tab khác');
+  expect(albumReads).toBe(2);
+});
+
+test('an older response cannot restore stale album data after revalidation', async () => {
+  let releaseOld: ((value: Response) => void) | undefined;
+  let firstRequested: (() => void) | undefined;
+  const reachedFirst = new Promise<void>((resolve) => {
+    firstRequested = resolve;
+  });
+  let albumReads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input), 'http://local.test').pathname.replace('/api/v1', '');
+      if (path === '/auth/session')
+        return json({ user: { id: 'u1', email: 'u@example.test', display_name: 'Owner' } });
+      if (path === '/albums') {
+        albumReads++;
+        if (albumReads === 1) {
+          firstRequested?.();
+          return new Promise<Response>((resolve) => {
+            releaseOld = resolve;
+          });
+        }
+        return json({ items: [], next_cursor: null });
+      }
+      if (path === '/albums/a1/members')
+        return json({ items: [{ user_id: 'u1', display_name: 'Owner', role: 'owner' }] });
+      if (path === '/albums/a1/invites' || path === '/albums/a1/memories')
+        return json({ items: [], next_cursor: null });
+      throw Error(`Unhandled ${path}`);
+    }),
+  );
+  const repo = new HttpRepository();
+  const oldRead = repo.read('u1');
+  await reachedFirst;
+  repo.invalidate();
+  expect((await repo.read('u1')).albums).toHaveLength(0);
+  releaseOld?.(
+    json({
+      items: [
+        { id: 'a1', owner_id: 'u1', title: 'Stale', description: '', version: 1, role: 'owner' },
+      ],
+      next_cursor: null,
+    }),
+  );
+  await oldRead;
+  expect((await repo.read('u1')).albums).toHaveLength(0);
+  expect(albumReads).toBe(2);
+});
+
+test('backend validation identifies the affected field without exposing submitted values', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () =>
+      json(
+        {
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid request',
+            fields: [{ field: 'body.email', message: 'Invalid email' }],
+          },
+        },
+        422,
+      ),
+    ),
+  );
+  await expect(
+    new HttpRepository().register({
+      email: 'bad',
+      username: 'person',
+      display_name: 'Person',
+      password: 'long-password',
+    }),
+  ).rejects.toMatchObject({
+    fields: { email: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.' },
+  } satisfies Partial<ApiError>);
+});
+
+test('photo order keeps newly uploaded photos interleaved with existing photos', async () => {
+  let savedOrder: string[] = [];
+  let uploads = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input), 'http://local.test').pathname.replace('/api/v1', '');
+      if (path === '/auth/csrf') return json({ csrf_token: 'csrf' });
+      if (path === '/albums/a1/memories' && init?.method === 'POST')
+        return json({ id: 'm1', album_id: 'a1', version: 1, published: true }, 201);
+      if (path === '/memories/m1/photos' && init?.method === 'POST')
+        return json({ id: `new-${++uploads}` }, 201);
+      if (path === '/memories/m1/photo-order' && init?.method === 'PUT') {
+        savedOrder = JSON.parse(String(init.body)).ids;
+        return json({});
+      }
+      throw Error(`Unhandled ${path}`);
+    }),
+  );
+  await new HttpRepository().dispatch('u1', {
+    type: 'saveMemory',
+    albumId: 'a1',
+    draft: { title: 'Story', date: '2026-01-01', location: '', note: '', animations: {} },
+    blobs: [new Blob(['one']), new Blob(['two'])],
+    preservePhotoIds: ['old-1', 'old-2'],
+    photoOrder: [
+      { kind: 'saved', id: 'old-1' },
+      { kind: 'new', index: 0 },
+      { kind: 'saved', id: 'old-2' },
+      { kind: 'new', index: 1 },
+    ],
+  });
+  expect(savedOrder).toEqual(['old-1', 'new-1', 'old-2', 'new-2']);
 });
 
 test('read drains album, memory, invitation, and comment cursors and restores social state', async () => {

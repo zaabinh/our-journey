@@ -14,7 +14,7 @@ export function AlbumForm({
   onClose: () => void;
   trigger?: React.ReactNode;
 }) {
-  const { dispatch } = useJourney(),
+  const { dispatch, repo } = useJourney(),
     action = useAction();
   const [title, setTitle] = useState(album?.title ?? ''),
     [description, setDescription] = useState(album?.description ?? '');
@@ -64,6 +64,7 @@ export function AlbumForm({
         <Input
           disabled={action.pending}
           label="Tên album"
+          error={action.fieldErrors.title}
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
@@ -72,9 +73,10 @@ export function AlbumForm({
         <Textarea
           disabled={action.pending}
           label="Lời giới thiệu"
+          error={action.fieldErrors.description}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          maxLength={2000}
+          maxLength={repo.mode === 'remote' ? 10000 : 2000}
           rows={4}
         />
         {action.error && <Alert>{action.error}</Alert>}

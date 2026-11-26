@@ -2,11 +2,13 @@
 @font-face {
   font-family: 'Dancing Script';
   src: url('/brand/DancingScript-VariableFont_wght.ttf') format('truetype');
+  font-weight: 400 700;
   font-display: swap;
 }
 @font-face {
   font-family: 'Cormorant Garamond';
   src: url('/brand/CormorantGaramond-VariableFont_wght.ttf') format('truetype');
+  font-weight: 300 700;
   font-display: swap;
 }
 :root {
@@ -155,6 +157,43 @@
 }
 .upload-preview {
   min-width: 0;
+}
+.memory-drop-zone {
+  border: 2px dashed var(--accent);
+  border-radius: 12px;
+  padding: 14px;
+  background: var(--paper);
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
+}
+.memory-drop-zone.is-active {
+  background: var(--surface);
+  border-color: var(--action);
+}
+.memory-drop-zone p {
+  margin: 0;
+}
+.upload-preview.is-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 12px;
+}
+.photo-drag-handle {
+  display: inline-grid;
+  place-items: center;
+  min-width: 36px;
+  min-height: 44px;
+  cursor: grab;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  touch-action: manipulation;
+  font-weight: 700;
+}
+.photo-drag-handle:focus-visible {
+  outline: 2px solid var(--accent);
 }
 .upload-preview .actions {
   gap: 4px;
@@ -2274,6 +2313,31 @@ main:has(.auth-page) .page-transition {
 .auth-page .field input {
   min-height: 40px;
   padding: 6px 11px;
+}
+.auth-password-field {
+  position: relative;
+  width: 100%;
+}
+.auth-password-field input {
+  padding-right: 62px !important;
+}
+.auth-password-toggle {
+  position: absolute;
+  right: 7px;
+  top: 26px;
+  min-width: 44px;
+  min-height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.auth-password-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .auth-switch {
   margin: 12px 0 0;

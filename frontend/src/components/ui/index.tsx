@@ -1,6 +1,7 @@
 import {
   useId,
   useRef,
+  useState,
   type ButtonHTMLAttributes,
   type HTMLAttributes,
   type InputHTMLAttributes,
@@ -36,18 +37,61 @@ export function Input({
 }: InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
   const uid = useId();
   const id = props.id ?? uid;
+  const [touched, setTouched] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const externalError = useRef<{ message?: string; value?: unknown }>({});
+  if (externalError.current.message !== error)
+    externalError.current = { message: error, value: props.value };
+  const message = error && externalError.current.value === props.value ? error : localError;
+  function validate(input: HTMLInputElement, display = true) {
+    input.setCustomValidity('');
+    if (input.required && input.type !== 'password' && !input.value.trim())
+      input.setCustomValidity(`${label} không được để trống.`);
+    const problem = input.validity;
+    const next = problem.valid
+      ? ''
+      : problem.customError
+        ? input.validationMessage
+        : problem.valueMissing
+          ? `${label} không được để trống.`
+          : problem.typeMismatch
+            ? `${label} không đúng định dạng.`
+            : problem.tooShort
+              ? `${label} cần ít nhất ${input.minLength} ký tự.`
+              : problem.tooLong
+                ? `${label} tối đa ${input.maxLength} ký tự.`
+                : problem.patternMismatch
+                  ? `${label} không đúng định dạng.`
+                  : `${label} không hợp lệ.`;
+    if (display) setLocalError(next);
+  }
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
       <input
         {...props}
         id={id}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : props['aria-describedby']}
+        aria-invalid={!!message}
+        aria-describedby={message ? `${id}-error` : props['aria-describedby']}
+        onChange={(event) => {
+          validate(event.currentTarget, touched);
+          props.onChange?.(event);
+        }}
+        onBlur={(event) => {
+          setTouched(true);
+          validate(event.currentTarget);
+          props.onBlur?.(event);
+        }}
+        onInvalid={(event) => {
+          event.preventDefault();
+          setTouched(true);
+          validate(event.currentTarget);
+          props.onInvalid?.(event);
+        }}
       />
-      {error && (
+      {message && (
         <span id={`${id}-error`} role="alert">
-          {error}
+          {message}
         </span>
       )}
     </div>
@@ -65,6 +109,32 @@ export function Textarea({
 }) {
   const uid = useId();
   const id = props.id ?? uid;
+  const [touched, setTouched] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const externalError = useRef<{ message?: string; value?: unknown }>({});
+  if (externalError.current.message !== error)
+    externalError.current = { message: error, value: props.value };
+  const message = error && externalError.current.value === props.value ? error : localError;
+  function validate(input: HTMLTextAreaElement, display = true) {
+    input.setCustomValidity('');
+    if (input.required && !input.value.trim())
+      input.setCustomValidity(`${label} không được để trống.`);
+    const problem = input.validity;
+    if (display)
+      setLocalError(
+        problem.valid
+          ? ''
+          : problem.customError
+            ? input.validationMessage
+            : problem.valueMissing
+              ? `${label} không được để trống.`
+              : problem.tooShort
+                ? `${label} cần ít nhất ${input.minLength} ký tự.`
+                : problem.tooLong
+                  ? `${label} tối đa ${input.maxLength} ký tự.`
+                  : `${label} không hợp lệ.`,
+      );
+  }
   return (
     <div className="field">
       <label htmlFor={id}>{label}</label>
@@ -72,12 +142,27 @@ export function Textarea({
         {...props}
         ref={inputRef}
         id={id}
-        aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : props['aria-describedby']}
+        aria-invalid={!!message}
+        aria-describedby={message ? `${id}-error` : props['aria-describedby']}
+        onChange={(event) => {
+          validate(event.currentTarget, touched);
+          props.onChange?.(event);
+        }}
+        onBlur={(event) => {
+          setTouched(true);
+          validate(event.currentTarget);
+          props.onBlur?.(event);
+        }}
+        onInvalid={(event) => {
+          event.preventDefault();
+          setTouched(true);
+          validate(event.currentTarget);
+          props.onInvalid?.(event);
+        }}
       />
-      {error && (
+      {message && (
         <span id={`${id}-error`} role="alert">
-          {error}
+          {message}
         </span>
       )}
     </div>

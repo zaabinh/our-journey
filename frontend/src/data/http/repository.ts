@@ -86,12 +86,30 @@ const kindByEmoji: Record<Emoji, string> = {
   sad: 'sad',
 };
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly fields: Record<string, string> = {},
+  ) {
+    super(message);
+  }
+}
+
 export class HttpRepository implements JourneyRepository {
   readonly mode = 'remote' as const;
   private csrf = '';
   private current?: Store;
   private cacheExpires = 0;
+  private cacheGeneration = 0;
+  private readSequence = 0;
+  private sessionActor = '';
   private inviteSecrets = new Map<string, { token: string; code: string }>();
+
+  invalidate() {
+    this.cacheExpires = 0;
+    this.cacheGeneration++;
+  }
 
   private async request<T>(path: string, init: RequestInit = {}, csrfRequired = true): Promise<T> {
     const headers = new Headers(init.headers);
@@ -113,12 +131,31 @@ export class HttpRepository implements JourneyRepository {
     });
     if (!response.ok) {
       let message = `Request failed (${response.status}).`;
+      let fields: Record<string, string> = {};
       try {
-        message = (await response.json()).error?.message ?? message;
+        const error = (await response.json()).error;
+        const localized: Record<string, string> = {
+          INVALID_CREDENTIALS: 'Email, tên đăng nhập hoặc mật khẩu không đúng.',
+          EMAIL_NOT_VERIFIED: 'Vui lòng xác minh email trước khi đăng nhập.',
+          VERSION_CONFLICT:
+            'Nội dung đã được thay đổi ở nơi khác. Vui lòng kiểm tra lại trước khi lưu.',
+          CONFLICT: 'Thông tin đã tồn tại hoặc xung đột với dữ liệu hiện có.',
+          VALIDATION_ERROR: 'Vui lòng kiểm tra lại các trường được đánh dấu.',
+        };
+        message =
+          localized[error?.code] ??
+          error?.message ??
+          (response.status >= 500 ? 'Máy chủ đang gặp sự cố. Vui lòng thử lại.' : message);
+        fields = Object.fromEntries(
+          (error?.fields ?? []).map((entry: { field: string }) => [
+            entry.field.replace(/^body\./, ''),
+            'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.',
+          ]),
+        );
       } catch {
         /* no JSON body */
       }
-      throw new Error(message);
+      throw new ApiError(message, response.status, fields);
     }
     return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
   }
@@ -145,7 +182,9 @@ export class HttpRepository implements JourneyRepository {
     );
     this.csrf = result.csrf_token;
     this.current = undefined;
-    this.cacheExpires = 0;
+    this.invalidate();
+    this.sessionActor = result.user.id;
+    this.inviteSecrets.clear();
   }
   async register(input: {
     email: string;
@@ -187,6 +226,8 @@ export class HttpRepository implements JourneyRepository {
     await this.request('/auth/logout', { method: 'POST' });
     this.csrf = '';
     this.current = undefined;
+    this.invalidate();
+    this.sessionActor = '';
     this.inviteSecrets.clear();
   }
   async uploadAvatar(file: Blob) {
@@ -202,6 +243,12 @@ export class HttpRepository implements JourneyRepository {
 
   async identity() {
     const { user } = await this.request<{ user: ApiUser }>('/auth/session');
+    if (this.sessionActor && this.sessionActor !== user.id) {
+      this.current = undefined;
+      this.inviteSecrets.clear();
+      this.invalidate();
+    }
+    this.sessionActor = user.id;
     return {
       active: user.id,
       users: [{ id: user.id, name: user.display_name, email: user.email }],
@@ -216,7 +263,10 @@ export class HttpRepository implements JourneyRepository {
 
   async read(actor: Id): Promise<Store> {
     if (this.current?.identity === actor && Date.now() < this.cacheExpires) return this.current;
+    const generation = this.cacheGeneration;
+    const sequence = ++this.readSequence;
     const { user: apiUser } = await this.request<{ user: ApiUser }>('/auth/session');
+    if (apiUser.id !== actor) throw new Error('Phiên đăng nhập đã thay đổi. Hãy tải lại trang.');
     const state = empty(actor);
     const user: User = {
       id: apiUser.id,
@@ -341,15 +391,17 @@ export class HttpRepository implements JourneyRepository {
     for (const [id, name] of names) {
       if (!state.users.some((u) => u.id === id)) state.users.push({ id, name, email: '' });
     }
-    this.current = state;
-    // Signed photo URLs last 120 seconds; expire the in-memory snapshot well before they do.
-    this.cacheExpires = Date.now() + 30_000;
+    if (generation === this.cacheGeneration && sequence === this.readSequence) {
+      this.current = state;
+      // Signed photo URLs last 120 seconds; expire the in-memory snapshot well before they do.
+      this.cacheExpires = Date.now() + 30_000;
+    }
     return state;
   }
 
   async dispatch(actor: Id, command: Command): Promise<Id | undefined> {
     const cached = this.current;
-    this.cacheExpires = 0;
+    this.invalidate();
     const json = (value: unknown) => JSON.stringify(value);
     switch (command.type) {
       case 'createAlbum': {
@@ -417,7 +469,11 @@ export class HttpRepository implements JourneyRepository {
         for (const id of previous?.photoIds ?? [])
           if (!command.preservePhotoIds?.includes(id))
             await this.request(`/photos/${id}`, { method: 'DELETE' });
-        const ordered = [...(command.preservePhotoIds ?? []), ...uploaded];
+        const ordered = command.photoOrder
+          ? command.photoOrder.map((entry) =>
+              entry.kind === 'saved' ? entry.id : uploaded[entry.index],
+            )
+          : [...(command.preservePhotoIds ?? []), ...uploaded];
         if (ordered.length)
           await this.request(`/memories/${item.id}/photo-order`, {
             method: 'PUT',

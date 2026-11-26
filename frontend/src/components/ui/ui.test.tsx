@@ -74,3 +74,35 @@ test('dirty form rejects discard and pending form cannot close', async () => {
   await user.keyboard('{Escape}');
   expect(screen.getByRole('dialog')).toBeTruthy();
 });
+test('required text rejects whitespace and clears its inline error after correction', async () => {
+  const submit = vi.fn();
+  function Form() {
+    const [value, setValue] = useState('');
+    return (
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit();
+        }}
+      >
+        <Input
+          label="Tên album"
+          required
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        />
+        <Button type="submit">Lưu</Button>
+      </form>
+    );
+  }
+  const user = userEvent.setup();
+  render(<Form />);
+  await user.type(screen.getByLabelText('Tên album'), '   ');
+  await user.click(screen.getByRole('button', { name: 'Lưu' }));
+  expect(submit).not.toHaveBeenCalled();
+  expect(screen.getByText('Tên album không được để trống.')).toBeTruthy();
+  await user.type(screen.getByLabelText('Tên album'), 'Kỷ niệm');
+  expect(screen.queryByText('Tên album không được để trống.')).toBeNull();
+  await user.click(screen.getByRole('button', { name: 'Lưu' }));
+  expect(submit).toHaveBeenCalledOnce();
+});

@@ -1,5 +1,5 @@
 import { NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useJourney } from './JourneyProvider';
 import { UnsavedChangesGuard } from './useUnsavedChanges';
 import { Button, Skeleton } from '../components/ui';
@@ -9,7 +9,8 @@ import { CardGridSkeleton, MemoryDetailSkeleton } from '../components/ui/skeleto
 
 export function AppShell() {
   const { pathname } = useLocation(),
-    { state, initialized, logout, repo } = useJourney();
+    { state, initialized, logout, repo, refresh } = useJourney();
+  const previousPath = useRef(pathname);
   const isPublic = [
     '/',
     '/login',
@@ -23,6 +24,12 @@ export function AppShell() {
   useEffect(() => {
     document.getElementById('main')?.focus();
   }, [pathname]);
+  useEffect(() => {
+    if (previousPath.current !== pathname) {
+      previousPath.current = pathname;
+      if (repo.mode === 'remote' && state) void refresh().catch(() => undefined);
+    }
+  }, [pathname, repo, state, refresh]);
   // Landing header is transparent over the hero and turns to frosted glass once scrolled.
   useEffect(() => {
     if (!homeRoute) return;

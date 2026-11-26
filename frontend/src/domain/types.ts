@@ -110,6 +110,7 @@ export type Command =
       draft: MemoryDraft;
       blobs: Blob[];
       preservePhotoIds?: Id[];
+      photoOrder?: ({ kind: 'saved'; id: Id } | { kind: 'new'; index: number })[];
     }
   | { type: 'deleteMemory'; memoryId: Id }
   | { type: 'publishMemory'; memoryId: Id }

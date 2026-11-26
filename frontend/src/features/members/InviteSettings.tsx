@@ -17,6 +17,11 @@ export function InviteSettings({ albumId }: { albumId: string }) {
     [saved, setSaved] = useState(false),
     [notice, setNotice] = useState('');
   useUnsavedChanges(!saved && (role !== 'viewer' || expiry !== initialExpiry || !!recipientEmail));
+  const expiryHours = (new Date(expiry).getTime() - Date.now()) / 3600000;
+  const expiryError =
+    !Number.isFinite(expiryHours) || expiryHours <= 0 || expiryHours > 168
+      ? 'Thời hạn lời mời phải nằm trong 7 ngày tới.'
+      : '';
   const invites = state!.invites.filter((i) => i.albumId === albumId);
   return (
     <section>
@@ -25,6 +30,7 @@ export function InviteSettings({ albumId }: { albumId: string }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (expiryError) return;
           void action.run(async () => {
             await dispatch({
               type: 'createInvite',
@@ -56,7 +62,9 @@ export function InviteSettings({ albumId }: { albumId: string }) {
         />
         <Input
           label="Email người nhận (tùy chọn)"
+          error={action.fieldErrors.recipient_email}
           type="email"
+          maxLength={254}
           autoComplete="email"
           value={recipientEmail}
           onChange={(e) => setRecipientEmail(e.target.value)}
@@ -64,6 +72,7 @@ export function InviteSettings({ albumId }: { albumId: string }) {
         />
         <Input
           label="Hết hạn (giờ thiết bị)"
+          error={expiryError || action.fieldErrors.hours}
           type="datetime-local"
           value={expiry}
           onChange={(e) => {

@@ -9,7 +9,7 @@ import {
 } from 'react';
 import type { Command, Id, JourneyRepository, Store } from '../domain/types';
 import { LocalRepository } from '../data/local/repository';
-import { HttpRepository } from '../data/http/repository';
+import { ApiError, HttpRepository } from '../data/http/repository';
 const repository: JourneyRepository =
   import.meta.env.MODE === 'test' || import.meta.env.VITE_DATA_MODE === 'local'
     ? new LocalRepository()
@@ -37,7 +37,11 @@ interface Journey {
 }
 export const JourneyContext = createContext<Journey | null>(null);
 export const errorMessage = (e: unknown) =>
-  e instanceof Error ? e.message : 'Không thể hoàn tất thao tác. Thử lại.';
+  e instanceof TypeError
+    ? 'Không thể kết nối máy chủ. Vui lòng thử lại.'
+    : e instanceof Error
+      ? e.message
+      : 'Không thể hoàn tất thao tác. Thử lại.';
 export function JourneyProvider({
   children,
   repo = repository,
@@ -54,6 +58,8 @@ export function JourneyProvider({
   const refresh = useCallback(async () => {
     const current = ++request.current;
     try {
+      if (repo.mode === 'remote' && 'invalidate' in repo)
+        (repo as JourneyRepository & { invalidate: () => void }).invalidate();
       const identity = await repo.identity(),
         next = await repo.read(identity.active);
       if (current === request.current) {
@@ -65,7 +71,10 @@ export function JourneyProvider({
     } catch (e) {
       if (current === request.current) {
         setError(errorMessage(e));
-        setState(undefined);
+        if (e instanceof ApiError && e.status === 401) {
+          setState(undefined);
+          setActor('');
+        }
         setInitialized(true);
       }
       throw e;
@@ -77,12 +86,29 @@ export function JourneyProvider({
       request.current++;
     };
   }, [refresh]);
+  useEffect(() => {
+    if (repo.mode !== 'remote' || !actor) return;
+    const revalidate = () => {
+      if (document.visibilityState === 'visible') void refresh().catch(() => undefined);
+    };
+    window.addEventListener('focus', revalidate);
+    document.addEventListener('visibilitychange', revalidate);
+    const timer = window.setInterval(revalidate, 30_000);
+    return () => {
+      window.removeEventListener('focus', revalidate);
+      document.removeEventListener('visibilitychange', revalidate);
+      window.clearInterval(timer);
+    };
+  }, [repo, refresh, actor]);
   async function mutate<T>(task: () => Promise<T>) {
     setPending((p) => p + 1);
     try {
       const result = await task();
       await refresh();
       return result;
+    } catch (e) {
+      await refresh().catch(() => undefined);
+      throw e;
     } finally {
       setPending((p) => p - 1);
     }
@@ -145,21 +171,33 @@ export function useJourney() {
 }
 export function useAction() {
   const [pending, setPending] = useState(false),
-    [error, setError] = useState('');
+    [error, setError] = useState(''),
+    [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const running = useRef(false);
   async function run(task: () => Promise<unknown>) {
     if (running.current) return;
     running.current = true;
     setPending(true);
     setError('');
+    setFieldErrors({});
     try {
       await task();
     } catch (e) {
       setError(errorMessage(e));
+      if (e instanceof ApiError) setFieldErrors(e.fields);
     } finally {
       running.current = false;
       setPending(false);
     }
   }
-  return { pending, error, run, clear: () => setError('') };
+  return {
+    pending,
+    error,
+    fieldErrors,
+    run,
+    clear: () => {
+      setError('');
+      setFieldErrors({});
+    },
+  };
 }
